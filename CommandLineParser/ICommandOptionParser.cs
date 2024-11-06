@@ -6,8 +6,10 @@ using System.Threading.Tasks;
 
 namespace CommandLineParser
 {
-    public interface ICommandOptionParser<T>
+    public interface ICommandOptionParser
     {
-        T Parse(ReadOnlySpan<char> value, ParseOptions options);
+        bool CanParse(Type type);
+
+        object Parse(ReadOnlySpan<char> value, ParseOptions options);
     }
 }

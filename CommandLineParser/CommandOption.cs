@@ -29,10 +29,22 @@ namespace CommandLineParser
             _requiredAttrib = attribs.OfType<RequiredAttribute>().FirstOrDefault();
         }
 
+        public Type Type => _prop.PropertyType;
+
         public char? ShortName => _nameAttrib.ShortName;
 
         public string? LongName => _nameAttrib.LongName;
 
         public bool IsRequired => _requiredAttrib is not null;
+
+        public void SetValue(ConsoleCommand instance, object value)
+            => _prop.GetSetMethod()!.Invoke(instance, [value]);
+
+        public string GetNames()
+            => ShortName is null
+                ? "--" + LongName
+                : LongName is null
+                ? "-" + ShortName.Value
+                : "-" + ShortName.Value + ", --" + LongName;
     }
 }
