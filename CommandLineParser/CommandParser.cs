@@ -13,7 +13,7 @@ using CommandLineParser.Utils;
 
 namespace CommandLineParser
 {
-    public class CommandParser
+    public static class CommandParser
     {
         public static readonly CommandParser Default = new CommandParser();
 
@@ -81,14 +81,9 @@ namespace CommandLineParser
                     : throw new InvalidArgValueException(option.GetNames(), $"'{value}' isn't a nuint byte."),
         }.ToFrozenDictionary();
 
-        private CommandParser()
-        {
-        }
-
         private delegate object SpanParseCtor(ReadOnlySpan<char> span);
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "a")]
-        public void ParseAndRun(string[] arguments, ParseOptions parseOptions, Type? defaultCommand, params Type[] commands)
+        public static void ParseAndRun(string[] arguments, ParseOptions parseOptions, Type? defaultCommand, params Type[] commands)
         {
             // TODO: try-catch, provide help text
             // TODO: help command, run if nothing is specified if the defaultCommand is null or it has options (if it doesn't have options, run it), help - description of all commands, help [command_name] - description of a specific command
