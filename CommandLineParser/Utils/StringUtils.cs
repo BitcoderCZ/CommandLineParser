@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Text;
 using CommandLineParser.Exceptions;
 
 namespace CommandLineParser.Utils
@@ -21,7 +17,7 @@ namespace CommandLineParser.Utils
                     {
                         if (i + 1 >= text.Length)
                         {
-                            throw new InvalidEscapeSequenceException(i);
+                            throw new InvalidEscapeSequenceException();
                         }
 
                         numbSequences++;

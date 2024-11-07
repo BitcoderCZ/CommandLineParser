@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace CommandLineParser.Attributes
+﻿namespace CommandLineParser.Attributes
 {
     /// <summary>
     /// The option this attribute is applied to will only be assignable if a property with the name <see cref="PropertyName"/> has the value <see cref="PropertyValue"/>.

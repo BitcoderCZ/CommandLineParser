@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace CommandLineParser.Exceptions
+﻿namespace CommandLineParser.Exceptions
 {
-    public sealed class CommandNotFoundException : Exception
+    public sealed class CommandNotFoundException : UserErrorException
     {
         public CommandNotFoundException(string commandName)
             : base($"Command \"{commandName}\" doesn't exist.")

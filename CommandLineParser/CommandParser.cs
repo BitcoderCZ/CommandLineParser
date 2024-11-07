@@ -1,13 +1,6 @@
-﻿using System;
-using System.Collections.Frozen;
-using System.Collections.Generic;
+﻿using System.Collections.Frozen;
 using System.Data;
-using System.Linq;
 using System.Linq.Expressions;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using CommandLineParser.Attributes;
 using CommandLineParser.Exceptions;
 using CommandLineParser.Utils;
 
@@ -15,8 +8,6 @@ namespace CommandLineParser
 {
     public static class CommandParser
     {
-        public static readonly CommandParser Default = new CommandParser();
-
         private static readonly FrozenDictionary<Type, Func<CommandOption, string, object>> ParseBasicTypes = new Dictionary<Type, Func<CommandOption, string, object>>()
         {
             [typeof(string)] = (option, value)
@@ -88,7 +79,6 @@ namespace CommandLineParser
             // TODO: try-catch, provide help text
             // TODO: help command, run if nothing is specified if the defaultCommand is null or it has options (if it doesn't have options, run it), help - description of all commands, help [command_name] - description of a specific command
             // TODO: version command - use Assembly version
-
             ConsoleCommand? command = null;
 
             ReadOnlySpan<string> args;
@@ -96,7 +86,7 @@ namespace CommandLineParser
             // find which command was called
             if (defaultCommand is not null && (arguments.Length == 0 || arguments[0].StartsWith('-')))
             {
-                command = CreateCommandInstance(defaultCommand);
+                command = ConsoleCommand.CreateInstance(defaultCommand);
                 args = arguments;
             }
             else
@@ -113,7 +103,7 @@ namespace CommandLineParser
                 {
                     if (ConsoleCommand.GetName(ct) == commandName)
                     {
-                        command = CreateCommandInstance(ct);
+                        command = ConsoleCommand.CreateInstance(ct);
                         break;
                     }
                 }
@@ -126,28 +116,25 @@ namespace CommandLineParser
 
             Type commandType = command.GetType();
 
-            CommandOption[] commandOptions = commandType
-                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(prop => prop.CanRead && prop.CanWrite && (prop.GetGetMethod(true)?.IsPublic ?? false) && (prop.GetSetMethod(true)?.IsPublic ?? false) && prop.GetCustomAttribute<OptionNameAttribute>() is not null)
-                .Select(prop => new CommandOption(prop))
-                .ToArray();
+            var (positionalOptions, namedOptions) = ConsoleCommand.GetOptions(commandType);
+            CommandOption[] allOptions = [.. positionalOptions, .. namedOptions];
 
-            Dictionary<char, CommandOption> shortNameOptions = [];
-            Dictionary<string, CommandOption> longNameOptions = [];
-            List<CommandOption> optionsToVerify = [];
+            Dictionary<char, NamedCommandOption> shortNameOptions = [];
+            Dictionary<string, NamedCommandOption> longNameOptions = [];
+            List<NamedCommandOption> optionsToVerify = [];
 
-            for (int i = 0; i < commandOptions.Length; i++)
+            for (int i = 0; i < namedOptions.Length; i++)
             {
-                var option = commandOptions[i];
+                var option = namedOptions[i];
 
-                if (option.ShortName is not null && !shortNameOptions.TryAdd(option.ShortName.Value, option))
+                if (option.ShortName is not null)
                 {
-                    throw new DuplicateOptionException(option.ShortName.Value.ToString());
+                    shortNameOptions.Add(option.ShortName.Value, option);
                 }
 
-                if (option.LongName is not null && !longNameOptions.TryAdd(option.LongName, option))
+                if (option.LongName is not null)
                 {
-                    throw new DuplicateOptionException(option.LongName);
+                    longNameOptions.Add(option.LongName, option);
                 }
 
                 if (option.DependsOnAnotherOption)
@@ -157,27 +144,35 @@ namespace CommandLineParser
             }
 
             // assign option values
+            int positionalOptionIndex = 0;
             HashSet<CommandOption> assignedOption = [];
 
             for (int i = 0; i < args.Length; i++)
             {
-                var (name, value, isLongName) = ParseArg(args[i]);
-
                 CommandOption? option;
+                string value;
 
-                if (isLongName)
+                if (args[i].StartsWith("-", StringComparison.Ordinal))
                 {
-                    if (!longNameOptions.TryGetValue(name, out option))
-                    {
-                        throw new OptionNotFoundException(name, ConsoleCommand.GetName(command));
-                    }
+                    (string name, value, bool isLongName) = ParseNamedArg(args[i]);
+
+                    option = isLongName
+                        ? longNameOptions.TryGetValue(name, out var longOption)
+                            ? longOption
+                            : throw new OptionNotFoundException(name, ConsoleCommand.GetName(command))
+                        : (shortNameOptions.TryGetValue(name[0], out var shortOption)
+                            ? shortOption
+                            : throw new OptionNotFoundException(name, ConsoleCommand.GetName(command)));
                 }
                 else
                 {
-                    if (!shortNameOptions.TryGetValue(name[0], out option))
+                    if (positionalOptionIndex >= positionalOptions.Length)
                     {
-                        throw new OptionNotFoundException(name, ConsoleCommand.GetName(command));
+                        throw new PositionalOptionOutOfBounds(positionalOptions.Length);
                     }
+
+                    option = positionalOptions[positionalOptionIndex++];
+                    value = args[i];
                 }
 
                 if (!assignedOption.Add(option) && parseOptions.ThrowOnDuplicateArgument)
@@ -189,7 +184,7 @@ namespace CommandLineParser
             }
 
             // validate required options have been assigned
-            foreach (var option in commandOptions.Where(option => option.IsRequired && !option.DependsOnAnotherOption))
+            foreach (var option in allOptions.Where(option => option.IsRequired && (option is not NamedCommandOption namedOption || !namedOption.DependsOnAnotherOption)))
             {
                 if (!assignedOption.Contains(option))
                 {
@@ -205,7 +200,7 @@ namespace CommandLineParser
 
                     foreach (var (name, val) in option.GetDependencies())
                     {
-                        var parentOption = commandOptions.FirstOrDefault(option => option.PropName == name) ?? throw new InvalidOptionDepencyException(option.GetNames(), name);
+                        var parentOption = namedOptions.FirstOrDefault(option => option.PropName == name) ?? throw new InvalidOptionDepencyException(option.GetNames(), name);
                         object? parentVal = parentOption.GetValue(command);
 
                         if (!(parentVal?.Equals(val) ?? (parentVal is null) == (val is null)))
@@ -234,21 +229,7 @@ namespace CommandLineParser
             command.Run();
         }
 
-        private static ConsoleCommand CreateCommandInstance(Type commandType)
-        {
-            if (!typeof(ConsoleCommand).IsAssignableFrom(commandType))
-            {
-                throw new ArgumentException($"Type '{commandType}' doesn't extend {typeof(ConsoleCommand)} class.", nameof(commandType));
-            }
-
-            var constructor = commandType.GetConstructor(Type.EmptyTypes);
-
-            return constructor is null
-                ? throw new ArgumentException($"Type '{commandType}' must have a public parameterless constructor.", nameof(commandType))
-                : (ConsoleCommand)constructor.Invoke([]);
-        }
-
-        private static (string Name, string Value, bool IsLongName) ParseArg(ReadOnlySpan<char> arg)
+        private static (string Name, string Value, bool IsLongName) ParseNamedArg(ReadOnlySpan<char> arg)
         {
             if (!arg.StartsWith("-", StringComparison.Ordinal))
             {
@@ -287,7 +268,7 @@ namespace CommandLineParser
             return (name, value, isLongName);
         }
 
-        private static object ParseOptionValue(CommandOption option, string value, ParseOptions options)
+        private static object ParseOptionValue(CommandOption option, string value, ParseOptions parseOptions)
         {
             if (ParseBasicTypes.TryGetValue(option.Type, out var parseFunc))
             {
@@ -300,11 +281,11 @@ namespace CommandLineParser
                     : throw new InvalidArgValueException(option.GetNames(), $"'{value}' isn't a valid for enum {option.Type.Name}, valid values are: {string.Join(", ", EnumExtension.GetNames(option.Type))}");
             }
 
-            for (int i = 0; i < options.Parsers.Count; i++)
+            for (int i = 0; i < parseOptions.Parsers.Count; i++)
             {
-                if (options.Parsers[i].CanParse(option.Type))
+                if (parseOptions.Parsers[i].CanParse(option.Type))
                 {
-                    return options.Parsers[i].Parse(value, options);
+                    return parseOptions.Parsers[i].Parse(value, parseOptions);
                 }
             }
 

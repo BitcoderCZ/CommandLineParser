@@ -1,24 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace CommandLineParser.Attributes
+﻿namespace CommandLineParser.Attributes
 {
-    /// <summary>
-    /// Specifies the name(s) of an option.
-    /// Required to make a property an option.
-    /// </summary>
     [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
-    public sealed class OptionNameAttribute : Attribute
+    public sealed class NamedOptionAttribute : Attribute
     {
-        public OptionNameAttribute(char shortName)
+        public NamedOptionAttribute(char shortName)
         {
             ShortName = shortName;
         }
 
-        public OptionNameAttribute(string longName)
+        public NamedOptionAttribute(string longName)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(longName);
 
@@ -32,7 +22,7 @@ namespace CommandLineParser.Attributes
             LongName = longName;
         }
 
-        public OptionNameAttribute(char shortName, string longName)
+        public NamedOptionAttribute(char shortName, string longName)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(longName);
 

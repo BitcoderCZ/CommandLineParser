@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace CommandLineParser.Exceptions
+﻿namespace CommandLineParser.Exceptions
 {
-    public sealed class NoCommandSpecified : Exception
+    public sealed class NoCommandSpecified : UserErrorException
     {
         public NoCommandSpecified()
             : base("No command was specified.")
