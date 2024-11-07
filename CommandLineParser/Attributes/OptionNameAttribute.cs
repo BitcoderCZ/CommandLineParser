@@ -6,6 +6,10 @@ using System.Threading.Tasks;
 
 namespace CommandLineParser.Attributes
 {
+    /// <summary>
+    /// Specifies the name(s) of an option.
+    /// Required to make a property an option.
+    /// </summary>
     [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
     public sealed class OptionNameAttribute : Attribute
     {

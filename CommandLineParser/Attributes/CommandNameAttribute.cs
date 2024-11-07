@@ -6,6 +6,10 @@ using System.Threading.Tasks;
 
 namespace CommandLineParser.Attributes
 {
+    /// <summary>
+    /// Specifies the name of a command.
+    /// Not required.
+    /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
     public sealed class CommandNameAttribute : Attribute
     {

@@ -15,10 +15,11 @@ namespace CommandLineParser
         private readonly PropertyInfo _prop;
         private readonly OptionNameAttribute _nameAttrib;
         private readonly RequiredAttribute? _requiredAttrib;
+        private readonly DependsOnAttribute[] _dependsOnAttribs;
 
         public CommandOption(PropertyInfo prop)
         {
-            Debug.Assert(prop.CanWrite && (prop.GetSetMethod(true)?.IsPublic ?? false), $"{nameof(prop)} must have a setter and the setter must be public.");
+            Debug.Assert(prop.CanRead && prop.CanWrite && (prop.GetGetMethod(true)?.IsPublic ?? false) && (prop.GetSetMethod(true)?.IsPublic ?? false), $"{nameof(prop)} must have a public getter and setter.");
 
             _prop = prop;
 
@@ -27,15 +28,23 @@ namespace CommandLineParser
                 ?? throw new MissingAttributeException(prop.Name, typeof(OptionNameAttribute));
 
             _requiredAttrib = attribs.OfType<RequiredAttribute>().FirstOrDefault();
+            _dependsOnAttribs = attribs.OfType<DependsOnAttribute>().ToArray();
         }
 
         public Type Type => _prop.PropertyType;
+
+        public string PropName => _prop.Name;
 
         public char? ShortName => _nameAttrib.ShortName;
 
         public string? LongName => _nameAttrib.LongName;
 
         public bool IsRequired => _requiredAttrib is not null;
+
+        public bool DependsOnAnotherOption => _dependsOnAttribs.Length > 0;
+
+        public object? GetValue(ConsoleCommand instance)
+            => _prop.GetGetMethod()!.Invoke(instance, []);
 
         public void SetValue(ConsoleCommand instance, object value)
             => _prop.GetSetMethod()!.Invoke(instance, [value]);
@@ -46,5 +55,8 @@ namespace CommandLineParser
                 : LongName is null
                 ? "-" + ShortName.Value
                 : "-" + ShortName.Value + ", --" + LongName;
+
+        public IEnumerable<(string Name, object? Value)> GetDependencies()
+            => _dependsOnAttribs.Select(attrib => (attrib.PropertyName, attrib.PropertyValue));
     }
 }

@@ -129,12 +129,13 @@ namespace CommandLineParser
 
             CommandOption[] commandOptions = commandType
                 .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(prop => prop.CanWrite && (prop.GetSetMethod(true)?.IsPublic ?? false) && prop.GetCustomAttribute<OptionNameAttribute>() is not null)
+                .Where(prop => prop.CanRead && prop.CanWrite && (prop.GetGetMethod(true)?.IsPublic ?? false) && (prop.GetSetMethod(true)?.IsPublic ?? false) && prop.GetCustomAttribute<OptionNameAttribute>() is not null)
                 .Select(prop => new CommandOption(prop))
                 .ToArray();
 
             Dictionary<char, CommandOption> shortNameOptions = [];
             Dictionary<string, CommandOption> longNameOptions = [];
+            List<CommandOption> optionsToVerify = [];
 
             for (int i = 0; i < commandOptions.Length; i++)
             {
@@ -148,6 +149,11 @@ namespace CommandLineParser
                 if (option.LongName is not null && !longNameOptions.TryAdd(option.LongName, option))
                 {
                     throw new DuplicateOptionException(option.LongName);
+                }
+
+                if (option.DependsOnAnotherOption)
+                {
+                    optionsToVerify.Add(option);
                 }
             }
 
@@ -182,11 +188,45 @@ namespace CommandLineParser
                 option.SetValue(command, ParseOptionValue(option, value, parseOptions));
             }
 
-            foreach (var option in commandOptions.Where(option => option.IsRequired))
+            foreach (var option in commandOptions.Where(option => option.IsRequired && !option.DependsOnAnotherOption))
             {
                 if (!assignedOption.Contains(option))
                 {
                     throw new RequiredOptionNotAssignedException(option.GetNames());
+                }
+            }
+
+            foreach (var option in optionsToVerify)
+            {
+                if (option.DependsOnAnotherOption)
+                {
+                    int numbNotEquals = 0;
+
+                    foreach (var (name, val) in option.GetDependencies())
+                    {
+                        var parentOption = commandOptions.FirstOrDefault(option => option.PropName == name) ?? throw new InvalidOptionDepencyException(option.GetNames(), name);
+                        object? parentVal = parentOption.GetValue(command);
+
+                        if (!(parentVal?.Equals(val) ?? (parentVal is null) == (val is null)))
+                        {
+                            numbNotEquals++;
+                        }
+                    }
+
+                    if (numbNotEquals == 0)
+                    {
+                        if (option.IsRequired && !assignedOption.Contains(option))
+                        {
+                            throw new RequiredOptionNotAssignedException(option.GetNames());
+                        }
+                    }
+                    else
+                    {
+                        if (assignedOption.Contains(option))
+                        {
+                            throw new InvalidOptionAssignedException(option.GetNames());
+                        }
+                    }
                 }
             }
 
