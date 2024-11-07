@@ -95,6 +95,7 @@ namespace CommandLineParser
 
             ReadOnlySpan<string> args;
 
+            // find which command was called
             if (defaultCommand is not null && (arguments.Length == 0 || arguments[0].StartsWith('-')))
             {
                 command = CreateCommandInstance(defaultCommand);
@@ -157,6 +158,7 @@ namespace CommandLineParser
                 }
             }
 
+            // assign option values
             HashSet<CommandOption> assignedOption = [];
 
             for (int i = 0; i < args.Length; i++)
@@ -188,6 +190,7 @@ namespace CommandLineParser
                 option.SetValue(command, ParseOptionValue(option, value, parseOptions));
             }
 
+            // validate required options have been assigned
             foreach (var option in commandOptions.Where(option => option.IsRequired && !option.DependsOnAnotherOption))
             {
                 if (!assignedOption.Contains(option))
