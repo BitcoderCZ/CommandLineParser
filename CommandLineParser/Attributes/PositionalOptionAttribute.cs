@@ -1,20 +1,19 @@
 ﻿using System.Runtime.CompilerServices;
 
-namespace CommandLineParser.Attributes
+namespace CommandLineParser.Attributes;
+
+[AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
+public sealed class PositionalOptionAttribute : Attribute
 {
-    [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
-    public sealed class PositionalOptionAttribute : Attribute
+    public PositionalOptionAttribute(string name, [CallerLineNumber] int order = 0)
     {
-        public PositionalOptionAttribute(string name, [CallerLineNumber] int order = 0)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
-            Name = name;
-            Order = order;
-        }
-
-        public string Name { get; }
-
-        public int Order { get; }
+        Name = name;
+        Order = order;
     }
+
+    public string Name { get; }
+
+    public int Order { get; }
 }

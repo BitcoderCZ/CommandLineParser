@@ -1,10 +1,9 @@
-﻿namespace CommandLineParser.Exceptions
+﻿namespace CommandLineParser.Exceptions;
+
+public sealed class NoCommandSpecified : UserErrorException
 {
-    public sealed class NoCommandSpecified : UserErrorException
+    public NoCommandSpecified()
+        : base("No command was specified.")
     {
-        public NoCommandSpecified()
-            : base("No command was specified.")
-        {
-        }
     }
 }

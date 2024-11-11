@@ -1,10 +1,9 @@
-﻿namespace CommandLineParser.Exceptions
+﻿namespace CommandLineParser.Exceptions;
+
+public sealed class InvalidOptionDepencyException : Exception
 {
-    public sealed class InvalidOptionDepencyException : Exception
+    public InvalidOptionDepencyException(string optionName, string propertyName)
+        : base($"Property '{propertyName}', which option {optionName} depends on, doesn't exist.")
     {
-        public InvalidOptionDepencyException(string optionName, string propertyName)
-            : base($"Property '{propertyName}', which option {optionName} depends on, doesn't exist.")
-        {
-        }
     }
 }

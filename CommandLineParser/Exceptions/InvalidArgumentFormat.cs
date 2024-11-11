@@ -1,10 +1,9 @@
-﻿namespace CommandLineParser.Exceptions
+﻿namespace CommandLineParser.Exceptions;
+
+public sealed class InvalidArgumentFormat : UserErrorException
 {
-    public sealed class InvalidArgumentFormat : UserErrorException
+    public InvalidArgumentFormat(string argName)
+        : base($"Argument \"{argName}\" isn't correctly formated.")
     {
-        public InvalidArgumentFormat(string argName)
-            : base($"Argument \"{argName}\" isn't correctly formated.")
-        {
-        }
     }
 }

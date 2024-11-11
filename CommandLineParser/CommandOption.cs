@@ -1,31 +1,39 @@
 ﻿using System.Reflection;
+using CommandLineParser.Attributes;
 
-namespace CommandLineParser
+namespace CommandLineParser;
+
+internal abstract class CommandOption
 {
-    internal abstract class CommandOption
+    protected readonly PropertyInfo _prop;
+
+    protected readonly HelpTextAttribute? helpTextAttribute;
+    protected readonly RequiredAttribute? requiredAttrib;
+
+    protected CommandOption(PropertyInfo prop)
     {
-        protected readonly PropertyInfo _prop;
-
-        protected CommandOption(PropertyInfo prop)
+        if (!(prop.CanRead && prop.CanWrite && (prop.GetGetMethod(true)?.IsPublic ?? false) && (prop.GetSetMethod(true)?.IsPublic ?? false)))
         {
-            if (!(prop.CanRead && prop.CanWrite && (prop.GetGetMethod(true)?.IsPublic ?? false) && (prop.GetSetMethod(true)?.IsPublic ?? false)))
-            {
-                throw new ArgumentException($"{nameof(prop)} must have a public getter and setter.", nameof(prop));
-            }
-
-            _prop = prop;
+            throw new ArgumentException($"{nameof(prop)} must have a public getter and setter.", nameof(prop));
         }
 
-        public abstract Type Type { get; }
+        _prop = prop;
 
-        public abstract string PropName { get; }
-
-        public abstract bool IsRequired { get; }
-
-        public abstract object? GetValue(ConsoleCommand instance);
-
-        public abstract void SetValue(ConsoleCommand instance, object value);
-
-        public abstract string GetNames();
+        helpTextAttribute = _prop.GetCustomAttribute<HelpTextAttribute>();
+        requiredAttrib = _prop.GetCustomAttribute<RequiredAttribute>();
     }
+
+    public Type Type => _prop.PropertyType;
+
+    public string PropName => _prop.Name;
+
+    public string? HelpText => helpTextAttribute?.HelpText;
+
+    public bool IsRequired => requiredAttrib is not null;
+
+    public abstract object? GetValue(ConsoleCommand instance);
+
+    public abstract void SetValue(ConsoleCommand instance, object? value);
+
+    public abstract string GetNames();
 }
