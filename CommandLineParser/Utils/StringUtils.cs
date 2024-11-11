@@ -305,4 +305,48 @@ internal static class StringUtils
             currentLineLength = 0;
         }
     }
+
+    // https://stackoverflow.com/a/50068838/15878562
+    public static string JoinAnd<T>(IEnumerable<T?> values, in string separator = ", ", in string lastSeparator = " and ")
+        => JoinAnd(values, new StringBuilder(), separator, lastSeparator).ToString();
+
+    public static StringBuilder JoinAnd<T>(IEnumerable<T?> values, StringBuilder sb, in string separator = ", ", in string lastSeparator = ", and ")
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        ArgumentNullException.ThrowIfNull(separator);
+        ArgumentNullException.ThrowIfNull(lastSeparator);
+
+        using var enumerator = values.GetEnumerator();
+
+        // add first item without separator
+        if (enumerator.MoveNext())
+        {
+            sb.Append(enumerator.Current);
+        }
+
+        var nextItem = (hasValue: false, item: default(T?));
+
+        // see if there is a next item
+        if (enumerator.MoveNext())
+        {
+            nextItem = (true, enumerator.Current);
+        }
+
+        // while there is a next item, add separator and current item
+        while (enumerator.MoveNext())
+        {
+            sb.Append(separator);
+            sb.Append(nextItem.item);
+            nextItem = (true, enumerator.Current);
+        }
+
+        // add last separator and last item
+        if (nextItem.hasValue)
+        {
+            sb.Append(lastSeparator ?? separator);
+            sb.Append(nextItem.item);
+        }
+
+        return sb;
+    }
 }

@@ -3,9 +3,9 @@
 namespace CommandLineParser.Attributes;
 
 [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
-public sealed class PositionalOptionAttribute : Attribute
+public sealed class ArgumentAttribute : Attribute
 {
-    public PositionalOptionAttribute(string name, [CallerLineNumber] int order = 0)
+    public ArgumentAttribute(string name, [CallerLineNumber] int order = 0)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 

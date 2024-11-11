@@ -1,14 +1,14 @@
 ﻿namespace CommandLineParser.Attributes;
 
 [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
-public sealed class NamedOptionAttribute : Attribute
+public sealed class OptionAttribute : Attribute
 {
-    public NamedOptionAttribute(char shortName)
+    public OptionAttribute(char shortName)
     {
         ShortName = shortName;
     }
 
-    public NamedOptionAttribute(string longName)
+    public OptionAttribute(string longName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(longName);
 
@@ -22,7 +22,7 @@ public sealed class NamedOptionAttribute : Attribute
         LongName = longName;
     }
 
-    public NamedOptionAttribute(char shortName, string longName)
+    public OptionAttribute(char shortName, string longName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(longName);
 

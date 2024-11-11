@@ -1,5 +1,7 @@
 ﻿using System.Reflection;
 using CommandLineParser.Attributes;
+using CommandLineParser.CommandParameters;
+using CommandLineParser.Exceptions;
 using CommandLineParser.Utils;
 
 namespace CommandLineParser;
@@ -11,22 +13,22 @@ public static class HelpText
         // required to get the default values
         ConsoleCommand command = ConsoleCommand.CreateInstance(commandType);
 
-        var (positional, named) = ConsoleCommand.GetOptions(commandType);
+        var (arguments, options) = ConsoleCommand.GetParameters(commandType);
 
         writer.Write("Usage: " + ConsoleCommand.GetName(commandType));
 
-        foreach (var option in positional)
+        foreach (var arg in arguments)
         {
-            writer.Write(option.IsRequired ? " <" : " [");
-            writer.Write(option.Name);
-            writer.Write(option.IsRequired ? '>' : ']');
+            writer.Write(arg.IsRequired ? " <" : " [");
+            writer.Write(arg.Name);
+            writer.Write(arg.IsRequired ? '>' : ']');
         }
 
         int nonReqNamedCount = 0;
 
-        foreach (var option in named)
+        foreach (var option in options)
         {
-            if (!option.IsRequired)
+            if (!option.IsRequired || option.DependsOnAnotherParameter)
             {
                 nonReqNamedCount++;
                 continue;
@@ -35,7 +37,7 @@ public static class HelpText
             writer.Write(' ');
             writer.Write(option.GetNames());
             writer.Write('=');
-            WriteValidOptionValues(option, writer);
+            WriteValidParameterValues(option, writer);
         }
 
         if (nonReqNamedCount > 0)
@@ -55,16 +57,16 @@ public static class HelpText
 
         int consoleWidth = Console.WindowWidth;
 
-        if (positional.Length > 0)
+        if (arguments.Length > 0)
         {
             writer.WriteLine("Arguments:");
 
-            string[] arr = new string[positional.Length * 2];
+            string[] arr = new string[arguments.Length * 2];
 
-            for (int i = 0; i < positional.Length; i++)
+            for (int i = 0; i < arguments.Length; i++)
             {
-                arr[(i * 2) + 0] = positional[i].GetNames();
-                arr[(i * 2) + 1] = GetOptionDescription(positional[i], command);
+                arr[(i * 2) + 0] = arguments[i].GetNames();
+                arr[(i * 2) + 1] = GetParameterDescription(arguments[i], command);
             }
 
             writer.Write2D(arr, consoleWidth, 2);
@@ -72,16 +74,16 @@ public static class HelpText
             writer.WriteLine();
         }
 
-        if (named.Length > 0)
+        if (options.Length > 0)
         {
             writer.WriteLine("Options:");
 
-            string[] arr = new string[named.Length * 2];
+            string[] arr = new string[options.Length * 2];
 
-            for (int i = 0; i < named.Length; i++)
+            for (int i = 0; i < options.Length; i++)
             {
-                arr[(i * 2) + 0] = named[i].GetNames();
-                arr[(i * 2) + 1] = GetOptionDescription(named[i], command);
+                arr[(i * 2) + 0] = options[i].GetNames();
+                arr[(i * 2) + 1] = GetParameterDescription(options[i], command);
             }
 
             writer.Write2D(arr, consoleWidth, 2);
@@ -90,27 +92,27 @@ public static class HelpText
         }
     }
 
-    private static void WriteValidOptionValues(CommandOption option, TextWriter writer)
+    private static void WriteValidParameterValues(CommandParameter parameter, TextWriter writer)
     {
-        if (option.Type == typeof(char))
+        if (parameter.Type == typeof(char))
         {
             writer.Write("<character>");
         }
-        else if (option.Type == typeof(bool))
+        else if (parameter.Type == typeof(bool))
         {
             writer.Write("true|false");
         }
-        else if (option.Type.IsEnum)
+        else if (parameter.Type.IsEnum)
         {
-            writer.Write(string.Join('|', EnumUtils.GetNames(option.Type)));
+            writer.Write(string.Join('|', EnumUtils.GetNames(parameter.Type)));
         }
-        else if (TypeUtils.IsNumber(option.Type))
+        else if (TypeUtils.IsNumber(parameter.Type))
         {
-            if (TypeUtils.IsFloatingPoint(option.Type))
+            if (TypeUtils.IsFloatingPoint(parameter.Type))
             {
                 writer.Write("<decimal number");
             }
-            else if (TypeUtils.IsInteger(option.Type))
+            else if (TypeUtils.IsInteger(parameter.Type))
             {
                 writer.Write("<whole number");
             }
@@ -120,7 +122,7 @@ public static class HelpText
             }
 
             // TODO: account for greater than, less than attribs ...
-            if (TypeUtils.TryGetMinMaxValues(option.Type, out object? min, out object? max))
+            if (TypeUtils.TryGetMinMaxValues(parameter.Type, out object? min, out object? max))
             {
                 writer.Write($", {min} to {max}>");
             }
@@ -135,27 +137,44 @@ public static class HelpText
         }
     }
 
-    private static string GetOptionDescription(CommandOption option, ConsoleCommand command)
+    private static string GetParameterDescription(CommandParameter parameter, ConsoleCommand command)
     {
         StringWriter writer = new StringWriter();
 
-        WriteValidOptionValues(option, writer);
+        WriteValidParameterValues(parameter, writer);
 
         writer.Write(' ');
 
-        if (option.IsRequired)
+        if (parameter is CommandOption option && option.DependsOnAnotherParameter)
+        {
+            var (args, options) = ConsoleCommand.GetParameters(command.GetType());
+
+            IEnumerable<CommandParameter> parameters = [.. args, .. options];
+
+            writer.Write("Only valid when: ");
+
+            writer.Write(StringUtils.JoinAnd(option.GetDependencies().Select(item =>
+            {
+                var parentParam = parameters.FirstOrDefault(option => option.PropName == item.Name) ?? throw new InvalidOptionDepencyException(option.GetNames(), item.Name);
+
+                return $"'{parentParam.GetNames()}' has the value '{ObjectUtils.ToString(item.Value)}'";
+            })));
+            writer.Write(". ");
+        }
+
+        if (parameter.IsRequired)
         {
             writer.Write("Required.");
         }
         else
         {
-            writer.Write($"Default: '{ObjectUtils.ToString(option.GetValue(command))}'.");
+            writer.Write($"Default: '{ObjectUtils.ToString(parameter.GetValue(command))}'.");
         }
 
-        if (!string.IsNullOrEmpty(option.HelpText))
+        if (!string.IsNullOrEmpty(parameter.HelpText))
         {
             writer.Write(' ');
-            writer.Write(option.HelpText);
+            writer.Write(parameter.HelpText);
         }
 
         return writer.ToString();

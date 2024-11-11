@@ -1,7 +1,7 @@
 ﻿namespace CommandLineParser.Attributes;
 
 /// <summary>
-/// Provides description for a command or an option.
+/// Provides description for a command or a parameter.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
 public sealed class HelpTextAttribute : Attribute

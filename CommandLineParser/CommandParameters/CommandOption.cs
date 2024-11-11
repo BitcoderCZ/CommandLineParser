@@ -2,22 +2,22 @@
 using CommandLineParser.Attributes;
 using CommandLineParser.Exceptions;
 
-namespace CommandLineParser;
+namespace CommandLineParser.CommandParameters;
 
-internal sealed class NamedCommandOption : CommandOption
+internal sealed class CommandOption : CommandParameter
 {
-    private readonly NamedOptionAttribute _optionAttrib;
+    private readonly OptionAttribute _optionAttrib;
     private readonly DependsOnAttribute[] _dependsOnAttribs;
 
-    public NamedCommandOption(PropertyInfo prop)
+    public CommandOption(PropertyInfo prop)
         : base(prop)
     {
-        _optionAttrib = prop.GetCustomAttribute<NamedOptionAttribute>()
-            ?? throw new MissingAttributeException(prop.Name, typeof(NamedOptionAttribute));
+        _optionAttrib = prop.GetCustomAttribute<OptionAttribute>()
+            ?? throw new MissingAttributeException(prop.Name, typeof(OptionAttribute));
 
-        if (prop.GetCustomAttribute<PositionalOptionAttribute>() is not null)
+        if (prop.GetCustomAttribute<ArgumentAttribute>() is not null)
         {
-            throw new ArgumentException($"{nameof(prop)} cannot have both {nameof(NamedOptionAttribute)} and {nameof(PositionalOptionAttribute)}.", nameof(prop));
+            throw new ArgumentException($"{nameof(prop)} cannot have both {nameof(OptionAttribute)} and {nameof(ArgumentAttribute)}.", nameof(prop));
         }
 
         _dependsOnAttribs = prop.GetCustomAttributes()
@@ -29,7 +29,7 @@ internal sealed class NamedCommandOption : CommandOption
 
     public string? LongName => _optionAttrib.LongName;
 
-    public bool DependsOnAnotherOption => _dependsOnAttribs.Length > 0;
+    public bool DependsOnAnotherParameter => _dependsOnAttribs.Length > 0;
 
     public override object? GetValue(ConsoleCommand instance)
         => _prop.GetGetMethod()!.Invoke(instance, []);

@@ -1,6 +1,6 @@
 ﻿namespace CommandLineParser;
 
-public interface ICommandOptionParser
+public interface ICommandParameterParser
 {
     bool CanParse(Type type);
 

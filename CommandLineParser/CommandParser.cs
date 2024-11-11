@@ -2,6 +2,7 @@
 using System.Data;
 using System.Linq.Expressions;
 using System.Reflection;
+using CommandLineParser.CommandParameters;
 using CommandLineParser.Exceptions;
 using CommandLineParser.Utils;
 
@@ -9,48 +10,48 @@ namespace CommandLineParser;
 
 public static class CommandParser
 {
-    private static readonly FrozenDictionary<Type, Func<CommandOption, string, object>> ParseBasicTypes = new Dictionary<Type, Func<CommandOption, string, object>>()
+    private static readonly FrozenDictionary<Type, Func<CommandParameter, string, object>> ParseBasicTypes = new Dictionary<Type, Func<CommandParameter, string, object>>()
     {
-        [typeof(string)] = (option, value)
+        [typeof(string)] = (param, value)
             => value,
-        [typeof(char)] = (option, value)
+        [typeof(char)] = (param, value)
             => !string.IsNullOrEmpty(value) && value.Length == 1
                 ? value[0]
-                : throw new InvalidArgValueException(option.GetNames(), $"'{value}' must be a single character."),
-        [typeof(bool)] = (option, value)
+                : throw new InvalidParameterValueException(param.GetNames(), $"'{value}' must be a single character."),
+        [typeof(bool)] = (param, value)
             => string.IsNullOrWhiteSpace(value) || value.Equals("true", StringComparison.OrdinalIgnoreCase)
                 ? true
                 : value.Equals("false", StringComparison.OrdinalIgnoreCase)
                 ? (object)false
-                : throw new InvalidArgValueException(option.GetNames(), $"'{value}' isn't a valid bool."),
+                : throw new InvalidParameterValueException(param.GetNames(), $"'{value}' isn't a valid bool."),
     }.ToFrozenDictionary();
 
     private delegate object SpanParseCtor(ReadOnlySpan<char> span);
 
-    public static void ParseAndRun(string[] arguments, ParseOptions parseOptions, Type? defaultCommand, params Type[] commands)
+    public static void ParseAndRun(string[] args, ParseOptions parseOptions, Type? defaultCommand, params Type[] commands)
     {
         // TODO: try-catch UserErrorException, provide help text
         // TODO: help command, run if nothing is specified if the defaultCommand is null or it has options (if it doesn't have options, run it), help - description of all commands, help [command_name] - description of a specific command
         // TODO: version command - use Assembly version
         ConsoleCommand? command = null;
 
-        ReadOnlySpan<string> args;
+        ReadOnlySpan<string> argsSpan;
 
         // find which command was called
-        if (defaultCommand is not null && (arguments.Length == 0 || arguments[0].StartsWith('-')))
+        if (defaultCommand is not null && (args.Length == 0 || args[0].StartsWith('-')))
         {
             command = ConsoleCommand.CreateInstance(defaultCommand);
-            args = arguments;
+            argsSpan = args;
         }
         else
         {
-            if (arguments.Length == 0 || arguments[0].StartsWith('-'))
+            if (args.Length == 0 || args[0].StartsWith('-'))
             {
                 throw new NoCommandSpecified();
             }
 
-            string commandName = arguments[0];
-            args = arguments.AsSpan(1);
+            string commandName = args[0];
+            argsSpan = args.AsSpan(1);
 
             foreach (var ct in commands)
             {
@@ -69,16 +70,16 @@ public static class CommandParser
 
         Type commandType = command.GetType();
 
-        var (positionalOptions, namedOptions) = ConsoleCommand.GetOptions(commandType);
-        CommandOption[] allOptions = [.. positionalOptions, .. namedOptions];
+        var (arguments, options) = ConsoleCommand.GetParameters(commandType);
+        CommandParameter[] parameters = [.. arguments, .. options];
 
-        Dictionary<char, NamedCommandOption> shortNameOptions = [];
-        Dictionary<string, NamedCommandOption> longNameOptions = [];
-        List<NamedCommandOption> optionsToVerify = [];
+        Dictionary<char, CommandOption> shortNameOptions = [];
+        Dictionary<string, CommandOption> longNameOptions = [];
+        List<CommandOption> optionsToVerify = [];
 
-        for (int i = 0; i < namedOptions.Length; i++)
+        for (int i = 0; i < options.Length; i++)
         {
-            var option = namedOptions[i];
+            var option = options[i];
 
             if (option.ShortName is not null)
             {
@@ -90,26 +91,26 @@ public static class CommandParser
                 longNameOptions.Add(option.LongName, option);
             }
 
-            if (option.DependsOnAnotherOption)
+            if (option.DependsOnAnotherParameter)
             {
                 optionsToVerify.Add(option);
             }
         }
 
-        // assign option values
-        int positionalOptionIndex = 0;
-        HashSet<CommandOption> assignedOption = [];
+        // assign parameter values
+        int argumentIndex = 0;
+        HashSet<CommandParameter> assignedParameters = [];
 
-        for (int i = 0; i < args.Length; i++)
+        for (int i = 0; i < argsSpan.Length; i++)
         {
-            CommandOption? option;
+            CommandParameter? parameter;
             string value;
 
-            if (args[i].StartsWith("-", StringComparison.Ordinal))
+            if (argsSpan[i].StartsWith("-", StringComparison.Ordinal))
             {
-                (string name, value, bool isLongName) = ParseNamedArg(args[i]);
+                (string name, value, bool isLongName) = ParseOption(argsSpan[i]);
 
-                option = isLongName
+                parameter = isLongName
                     ? longNameOptions.TryGetValue(name, out var longOption)
                         ? longOption
                         : throw new OptionNotFoundException(name, ConsoleCommand.GetName(command))
@@ -119,44 +120,44 @@ public static class CommandParser
             }
             else
             {
-                if (positionalOptionIndex >= positionalOptions.Length)
+                if (argumentIndex >= arguments.Length)
                 {
-                    throw new PositionalOptionOutOfBounds(positionalOptions.Length);
+                    throw new ArgumentOutOfBounds(arguments.Length);
                 }
 
-                option = positionalOptions[positionalOptionIndex++];
-                value = args[i];
+                parameter = arguments[argumentIndex++];
+                value = argsSpan[i];
             }
 
-            if (!assignedOption.Add(option) && parseOptions.ThrowOnDuplicateArgument)
+            if (!assignedParameters.Add(parameter) && parseOptions.ThrowOnDuplicateArgument)
             {
-                throw new DuplicateOptionException(option.GetNames());
+                throw new DuplicateParameterException(parameter.GetNames());
             }
 
-            option.SetValue(command, ParseOptionValue(option, value, parseOptions));
+            parameter.SetValue(command, ParseParameterValue(parameter, value, parseOptions));
         }
 
         // validate required options have been assigned
-        foreach (var option in allOptions.Where(option => option.IsRequired && (option is not NamedCommandOption namedOption || !namedOption.DependsOnAnotherOption)))
+        foreach (var parameter in parameters.Where(parameter => parameter.IsRequired && (parameter is not CommandOption option || !option.DependsOnAnotherParameter)))
         {
-            if (!assignedOption.Contains(option))
+            if (!assignedParameters.Contains(parameter))
             {
-                throw new RequiredOptionNotAssignedException(option.GetNames());
+                throw new ParameterNotAssignedException(parameter.GetNames());
             }
         }
 
         foreach (var option in optionsToVerify)
         {
-            if (option.DependsOnAnotherOption)
+            if (option.DependsOnAnotherParameter)
             {
                 int numbNotEquals = 0;
 
                 foreach (var (name, val) in option.GetDependencies())
                 {
-                    var parentOption = namedOptions.FirstOrDefault(option => option.PropName == name) ?? throw new InvalidOptionDepencyException(option.GetNames(), name);
-                    object? parentVal = parentOption.GetValue(command);
+                    var parentParameter = parameters.FirstOrDefault(option => option.PropName == name) ?? throw new InvalidOptionDepencyException(option.GetNames(), name);
+                    object? parentVal = parentParameter.GetValue(command);
 
-                    if (!(parentVal?.Equals(val) ?? (parentVal is null) == (val is null)))
+                    if (!Equals(parentVal, val))
                     {
                         numbNotEquals++;
                     }
@@ -164,16 +165,16 @@ public static class CommandParser
 
                 if (numbNotEquals == 0)
                 {
-                    if (option.IsRequired && !assignedOption.Contains(option))
+                    if (option.IsRequired && !assignedParameters.Contains(option))
                     {
-                        throw new RequiredOptionNotAssignedException(option.GetNames());
+                        throw new ParameterNotAssignedException(option.GetNames());
                     }
                 }
                 else
                 {
-                    if (assignedOption.Contains(option))
+                    if (assignedParameters.Contains(option))
                     {
-                        throw new InvalidOptionAssignedException(option.GetNames());
+                        throw new InvalidParameterAssignedException(option.GetNames());
                     }
                 }
             }
@@ -182,11 +183,11 @@ public static class CommandParser
         command.Run();
     }
 
-    private static (string Name, string Value, bool IsLongName) ParseNamedArg(ReadOnlySpan<char> arg)
+    private static (string Name, string Value, bool IsLongName) ParseOption(ReadOnlySpan<char> arg)
     {
         if (!arg.StartsWith("-", StringComparison.Ordinal))
         {
-            throw new InvalidArgumentFormat(new string(arg));
+            throw new InvalidOptionFormat(new string(arg));
         }
 
         // remove - or --
@@ -221,29 +222,29 @@ public static class CommandParser
         return (name, value, isLongName);
     }
 
-    private static object? ParseOptionValue(CommandOption option, string value, ParseOptions parseOptions)
+    private static object? ParseParameterValue(CommandParameter parameter, string value, ParseOptions parseOptions)
     {
         for (int i = 0; i < parseOptions.Parsers.Count; i++)
         {
-            if (parseOptions.Parsers[i].CanParse(option.Type))
+            if (parseOptions.Parsers[i].CanParse(parameter.Type))
             {
                 return parseOptions.Parsers[i].Parse(value, parseOptions);
             }
         }
 
-        if (ParseBasicTypes.TryGetValue(option.Type, out var parseFunc))
+        if (ParseBasicTypes.TryGetValue(parameter.Type, out var parseFunc))
         {
-            return parseFunc.Invoke(option, value);
+            return parseFunc.Invoke(parameter, value);
         }
-        else if (option.Type.IsEnum)
+        else if (parameter.Type.IsEnum)
         {
-            return EnumUtils.TryParse(option.Type, value, out object? enumValue)
+            return EnumUtils.TryParse(parameter.Type, value, out object? enumValue)
                 ? enumValue
-                : throw new InvalidArgValueException(option.GetNames(), $"'{value}' isn't a valid value for enum {option.Type.Name}, valid values are: {string.Join(", ", EnumUtils.GetNames(option.Type))}");
+                : throw new InvalidParameterValueException(parameter.GetNames(), $"'{value}' isn't a valid value for enum {parameter.Type.Name}, valid values are: {string.Join(", ", EnumUtils.GetNames(parameter.Type))}");
         }
-        else if (option.Type.HasGenericInterface(typeof(IParsable<>)))
+        else if (parameter.Type.HasGenericInterface(typeof(IParsable<>)))
         {
-            InterfaceMapping mapping = option.Type.GetInterfaceMap(typeof(IParsable<>).MakeGenericType([option.Type]));
+            InterfaceMapping mapping = parameter.Type.GetInterfaceMap(typeof(IParsable<>).MakeGenericType([parameter.Type]));
 
             try
             {
@@ -251,12 +252,12 @@ public static class CommandParser
             }
             catch (Exception ex)
             {
-                throw new InvalidArgValueException(option.GetNames(), ex);
+                throw new InvalidParameterValueException(parameter.GetNames(), ex);
             }
         }
 
         // string constructor
-        var constructor = option.Type.GetConstructor([typeof(string)]);
+        var constructor = parameter.Type.GetConstructor([typeof(string)]);
 
         if (constructor is not null)
         {
@@ -264,7 +265,7 @@ public static class CommandParser
         }
 
         // ReadOnlySpan<char> ctor
-        constructor = option.Type.GetConstructor([typeof(ReadOnlySpan<char>)]);
+        constructor = parameter.Type.GetConstructor([typeof(ReadOnlySpan<char>)]);
 
         if (constructor is not null)
         {
@@ -278,6 +279,6 @@ public static class CommandParser
             return delegateCtor((ReadOnlySpan<char>)value);
         }
 
-        throw new Exception($"The option '{option.GetNames()}' couldn't be parsed because it doesn't have a constructor that takes string/ReadOnlySpan<char> and no custom parser is defined for it.");
+        throw new Exception($"The option '{parameter.GetNames()}' couldn't be parsed because it doesn't have a constructor that takes string/ReadOnlySpan<char> and no custom parser is defined for it.");
     }
 }

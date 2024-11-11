@@ -60,7 +60,7 @@ internal static class TextWriterUtils
     {
         const int MinSecondColumnLength = 8;
 
-        writerWidth -= writer.NewLine.Length + 1;
+        writerWidth--; // leave space for newline character
 
         if (span.Length % 2 != 0)
         {
@@ -109,7 +109,7 @@ internal static class TextWriterUtils
 
             ReadOnlySpan<char> secondColumnText = span[i + 1];
 
-            if (secondColumnText.Length + (padding * 2) + span[i].Length < writerWidth)
+            if (secondColumnText.Length + padString2.Length < writerWidth)
             {
                 writer.WriteLine(secondColumnText);
                 continue;

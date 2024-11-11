@@ -1,16 +1,16 @@
 ﻿using System.Reflection;
 using CommandLineParser.Attributes;
 
-namespace CommandLineParser;
+namespace CommandLineParser.CommandParameters;
 
-internal abstract class CommandOption
+internal abstract class CommandParameter
 {
     protected readonly PropertyInfo _prop;
 
     protected readonly HelpTextAttribute? helpTextAttribute;
     protected readonly RequiredAttribute? requiredAttrib;
 
-    protected CommandOption(PropertyInfo prop)
+    protected CommandParameter(PropertyInfo prop)
     {
         if (!(prop.CanRead && prop.CanWrite && (prop.GetGetMethod(true)?.IsPublic ?? false) && (prop.GetSetMethod(true)?.IsPublic ?? false)))
         {

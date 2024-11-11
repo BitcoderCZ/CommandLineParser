@@ -4,5 +4,5 @@ public sealed class ParseOptions
 {
     public bool ThrowOnDuplicateArgument { get; set; } = true;
 
-    public List<ICommandOptionParser> Parsers { get; } = [];
+    public List<ICommandParameterParser> Parsers { get; } = [];
 }

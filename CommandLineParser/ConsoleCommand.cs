@@ -1,6 +1,7 @@
 ﻿using System.Data;
 using System.Reflection;
 using CommandLineParser.Attributes;
+using CommandLineParser.CommandParameters;
 using CommandLineParser.Exceptions;
 using CommandLineParser.Utils;
 
@@ -27,7 +28,7 @@ public abstract class ConsoleCommand
             : (ConsoleCommand)constructor.Invoke([]);
     }
 
-    internal static (PositionalCommandOption[] PositionalOptions, NamedCommandOption[] NamedOptions) GetOptions(Type commandType)
+    internal static (CommandArgument[] Arguments, CommandOption[] Options) GetParameters(Type commandType)
     {
         ValidateType(commandType);
 
@@ -36,14 +37,14 @@ public abstract class ConsoleCommand
             .Where(prop => prop.CanRead && prop.CanWrite && (prop.GetGetMethod(true)?.IsPublic ?? false) && (prop.GetSetMethod(true)?.IsPublic ?? false))
             .ToArray();
 
-        var positional = properties
-            .Where(prop => prop.GetCustomAttribute<PositionalOptionAttribute>() is not null)
-            .Select(prop => new PositionalCommandOption(prop))
-            .OrderBy(option => option.Order)
+        var arguments = properties
+            .Where(prop => prop.GetCustomAttribute<ArgumentAttribute>() is not null)
+            .Select(prop => new CommandArgument(prop))
+            .OrderBy(arg => arg.Order)
             .ToArray();
 
-        var duplicates = positional
-            .GroupBy(option => option.Order)
+        var duplicates = arguments
+            .GroupBy(arg => arg.Order)
             .FirstOrDefault(group => group.Count() > 1);
 
         if (duplicates is not null)
@@ -56,49 +57,49 @@ public abstract class ConsoleCommand
 
             var second = enumerator.Current;
 
-            throw new Exception($"Positional options '{first.Name}' and '{second.Name}' have the same order ({first.Order}).");
+            throw new Exception($"Arguments '{first.Name}' and '{second.Name}' have the same order ({first.Order}).");
         }
 
         bool foundNonRequired = false;
-        for (int i = 0; i < positional.Length; i++)
+        for (int i = 0; i < arguments.Length; i++)
         {
-            if (!positional[i].IsRequired)
+            if (!arguments[i].IsRequired)
             {
                 foundNonRequired = true;
             }
-            else if (positional[i].IsRequired && foundNonRequired)
+            else if (arguments[i].IsRequired && foundNonRequired)
             {
-                throw new Exception($"Required positional options must come before non required ones ({positional[i - 1].Name}, {positional[i].Name}).");
+                throw new Exception($"Required arguments must come before non required ones ({arguments[i - 1].Name}, {arguments[i].Name}).");
             }
         }
 
-        var named = properties
-            .Where(prop => prop.GetCustomAttribute<NamedOptionAttribute>() is not null)
-            .Select(prop => new NamedCommandOption(prop))
+        var options = properties
+            .Where(prop => prop.GetCustomAttribute<OptionAttribute>() is not null)
+            .Select(prop => new CommandOption(prop))
             .ToArray();
 
         HashSet<char> shortNameOptions = [];
         HashSet<string> longNameOptions = [];
 
-        for (int i = 0; i < named.Length; i++)
+        for (int i = 0; i < options.Length; i++)
         {
-            var option = named[i];
+            var option = options[i];
 
             if (option.ShortName is not null && !shortNameOptions.Add(option.ShortName.Value))
             {
-                throw new DuplicateOptionException(option.ShortName.Value.ToString());
+                throw new DuplicateParameterException(option.ShortName.Value.ToString());
             }
 
             if (option.LongName is not null && !longNameOptions.Add(option.LongName))
             {
-                throw new DuplicateOptionException(option.LongName);
+                throw new DuplicateParameterException(option.LongName);
             }
         }
 
         return
         (
-            positional,
-            named
+            arguments,
+            options
         );
     }
 
