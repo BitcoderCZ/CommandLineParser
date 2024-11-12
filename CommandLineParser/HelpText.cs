@@ -1,8 +1,10 @@
 ﻿using System.CodeDom.Compiler;
 using System.Data;
+using System.Diagnostics;
 using System.Reflection;
 using CommandLineParser.Attributes;
 using CommandLineParser.CommandParameters;
+using CommandLineParser.Commands;
 using CommandLineParser.Exceptions;
 using CommandLineParser.Utils;
 
@@ -10,6 +12,48 @@ namespace CommandLineParser;
 
 public static class HelpText
 {
+    public static void GenerateVersionInfo(TextWriter writer)
+    {
+        Assembly? assembly = Assembly.GetEntryAssembly();
+
+        if (assembly is null)
+        {
+            writer.WriteLine("Failed to get version information.");
+            return;
+        }
+
+        var name = assembly.GetName();
+
+        FileVersionInfo? versionInfo = null;
+        if (!string.IsNullOrWhiteSpace(Environment.ProcessPath))
+        {
+            versionInfo = FileVersionInfo.GetVersionInfo(Environment.ProcessPath);
+        }
+
+        writer.WriteLine($"{name.Name} {versionInfo?.ProductVersion ?? name.Version?.ToString()}");
+        if (versionInfo is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(versionInfo.LegalCopyright))
+            {
+                writer.WriteLine(versionInfo.LegalCopyright);
+            }
+            else if (!string.IsNullOrWhiteSpace(versionInfo.CompanyName))
+            {
+                writer.WriteLine($"Copyright (C) {DateTime.UtcNow.Year} {versionInfo.CompanyName}");
+            }
+        }
+
+        writer.WriteLine();
+    }
+
+    public static void GenerateForCommands(IEnumerable<Type> commandTypes, TextWriter writer)
+    {
+        foreach (Type commandType in commandTypes)
+        {
+            GenerateForCommand(commandType, writer);
+        }
+    }
+
     public static void GenerateForCommand(Type commandType, TextWriter writer)
     {
         // required to get the default values
@@ -98,7 +142,7 @@ public static class HelpText
     {
         IndentedTextWriter indentedWriter = writer as IndentedTextWriter ?? new IndentedTextWriter(writer, "  ");
 
-        indentedWriter.WriteLine("Error:");
+        indentedWriter.WriteLine("ERROR:");
         indentedWriter.Indent++;
 
         indentedWriter.WriteLine(exception.Message);

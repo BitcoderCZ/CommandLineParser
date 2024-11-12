@@ -1,8 +1,10 @@
 ﻿using System.Collections.Frozen;
+using System.Collections.Immutable;
 using System.Data;
 using System.Linq.Expressions;
 using System.Reflection;
 using CommandLineParser.CommandParameters;
+using CommandLineParser.Commands;
 using CommandLineParser.Exceptions;
 using CommandLineParser.Utils;
 
@@ -26,19 +28,39 @@ public static class CommandParser
                 : throw new InvalidParameterValueException(param.GetNames(), $"'{value}' isn't a valid bool.", param.CommandType),
     }.ToFrozenDictionary();
 
+    private static readonly ImmutableArray<Type> BuiltInCommands =
+    [
+        typeof(HelpCommand),
+        typeof(VersionCommand),
+    ];
+
     private delegate object SpanParseCtor(ReadOnlySpan<char> span);
 
-    public static void ParseAndRun(string[] args, ParseOptions parseOptions, Type? defaultCommand, Type[] commands, TextWriter? helpTextWriter = null)
+    public static void ParseAndRun(string[] args, ParseOptions parseOptions, Type? defaultCommand, IEnumerable<Type> commands, TextWriter? helpTextWriter = null)
     {
-        ConsoleCommand command;
+        commands = new HashSet<Type>(commands);
+        var commandsSet = (HashSet<Type>)commands;
 
+        if (defaultCommand is not null)
+        {
+            commandsSet.Add(defaultCommand);
+        }
+
+        foreach (var ct in BuiltInCommands)
+        {
+            commandsSet.Add(ct);
+        }
+
+        helpTextWriter ??= Console.Out;
+
+        ConsoleCommand command;
         try
         {
             command = ParseInternal(args, parseOptions, defaultCommand, commands);
         }
         catch (UserErrorException ex)
         {
-            helpTextWriter ??= Console.Out;
+            HelpText.GenerateVersionInfo(helpTextWriter);
 
             HelpText.GenerateForError(ex, helpTextWriter);
 
@@ -46,17 +68,37 @@ public static class CommandParser
             {
                 HelpText.GenerateForCommand(ex.CommandType, helpTextWriter);
             }
+            else if (ex is NoCommandSpecified or CommandNotFoundException)
+            {
+                HelpText.GenerateForCommands(commands, helpTextWriter);
+            }
 
+            return;
+        }
+        catch (ShowHelpException ex)
+        {
+            HelpText.GenerateVersionInfo(helpTextWriter);
+            HelpText.GenerateForCommand(ex.CommandType, helpTextWriter);
+            return;
+        }
+
+        if (command is HelpCommand)
+        {
+            HelpText.GenerateVersionInfo(helpTextWriter);
+            HelpText.GenerateForCommands(commands, helpTextWriter);
+            return;
+        }
+        else if (command is VersionCommand)
+        {
+            HelpText.GenerateVersionInfo(helpTextWriter);
             return;
         }
 
         command.Run();
     }
 
-    private static ConsoleCommand ParseInternal(string[] args, ParseOptions parseOptions, Type? defaultCommand, params Type[] commands)
+    private static ConsoleCommand ParseInternal(string[] args, ParseOptions parseOptions, Type? defaultCommand, IEnumerable<Type> commands)
     {
-        // TODO: help command, run if nothing is specified if the defaultCommand is null or it has options (if it doesn't have options, run it), help - description of all commands, help [command_name] - description of a specific command
-        // TODO: version command - use Assembly version
         ConsoleCommand? command = null;
 
         ReadOnlySpan<string> argsSpan;
@@ -133,6 +175,11 @@ public static class CommandParser
             if (argsSpan[i].StartsWith("-", StringComparison.Ordinal))
             {
                 (string name, value, bool isLongName) = ParseOption(argsSpan[i], commandType);
+
+                if (isLongName && name == "help")
+                {
+                    throw new ShowHelpException(commandType);
+                }
 
                 parameter = isLongName
                     ? longNameOptions.TryGetValue(name, out var longOption)

@@ -5,7 +5,7 @@ using CommandLineParser.CommandParameters;
 using CommandLineParser.Exceptions;
 using CommandLineParser.Utils;
 
-namespace CommandLineParser;
+namespace CommandLineParser.Commands;
 
 public abstract class ConsoleCommand
 {

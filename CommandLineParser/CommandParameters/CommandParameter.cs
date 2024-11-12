@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using CommandLineParser.Attributes;
+using CommandLineParser.Commands;
 using CommandLineParser.Exceptions;
 using CommandLineParser.Utils;
 

@@ -1,4 +1,6 @@
-﻿namespace CommandLineParser.Exceptions;
+﻿using CommandLineParser.Commands;
+
+namespace CommandLineParser.Exceptions;
 
 /// <summary>
 /// An <see cref="Exception"/> cause by the user, usually by entering data incorrectly.
