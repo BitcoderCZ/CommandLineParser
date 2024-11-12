@@ -9,7 +9,7 @@ namespace CommandLineParser.Commands;
 
 public abstract class ConsoleCommand
 {
-    public abstract void Run();
+    public abstract int Run();
 
     internal static string GetName(ConsoleCommand command)
         => GetName(command.GetType());

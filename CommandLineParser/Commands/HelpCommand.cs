@@ -6,6 +6,6 @@ namespace CommandLineParser.Commands;
 [CommandName("help")]
 internal class HelpCommand : ConsoleCommand
 {
-    public override void Run()
-        => new InvalidOperationException();
+    public override int Run()
+        => throw new InvalidOperationException();
 }

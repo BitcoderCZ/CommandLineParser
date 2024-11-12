@@ -6,6 +6,6 @@ namespace CommandLineParser.Commands;
 [CommandName("version")]
 internal class VersionCommand : ConsoleCommand
 {
-    public override void Run()
+    public override int Run()
         => throw new InvalidOperationException();
 }

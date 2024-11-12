@@ -36,11 +36,20 @@ public static class CommandParser
 
     private delegate object SpanParseCtor(ReadOnlySpan<char> span);
 
-    public static void ParseAndRun(string[] args, ParseOptions parseOptions, Type? defaultCommand, IEnumerable<Type> commands, TextWriter? helpTextWriter = null)
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="args"></param>
+    /// <param name="parseOptions"></param>
+    /// <param name="defaultCommand"></param>
+    /// <param name="commands"></param>
+    /// <param name="helpTextWriter"></param>
+    /// <returns>Exit code</returns>
+    public static int ParseAndRun(string[] args, ParseOptions parseOptions, Type? defaultCommand, IEnumerable<Type> commands, TextWriter? helpTextWriter = null)
     {
         commands = new HashSet<Type>(commands);
         var commandsSet = (HashSet<Type>)commands;
-
+        
         if (defaultCommand is not null)
         {
             commandsSet.Add(defaultCommand);
@@ -73,28 +82,28 @@ public static class CommandParser
                 HelpText.GenerateForCommands(commands, helpTextWriter);
             }
 
-            return;
+            return 1;
         }
         catch (ShowHelpException ex)
         {
             HelpText.GenerateVersionInfo(helpTextWriter);
             HelpText.GenerateForCommand(ex.CommandType, helpTextWriter);
-            return;
+            return 0;
         }
 
         if (command is HelpCommand)
         {
             HelpText.GenerateVersionInfo(helpTextWriter);
             HelpText.GenerateForCommands(commands, helpTextWriter);
-            return;
+            return 0;
         }
         else if (command is VersionCommand)
         {
             HelpText.GenerateVersionInfo(helpTextWriter);
-            return;
+            return 0;
         }
 
-        command.Run();
+        return command.Run();
     }
 
     private static ConsoleCommand ParseInternal(string[] args, ParseOptions parseOptions, Type? defaultCommand, IEnumerable<Type> commands)
