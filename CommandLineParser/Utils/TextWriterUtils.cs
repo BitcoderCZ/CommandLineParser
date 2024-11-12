@@ -6,6 +6,13 @@ internal static class TextWriterUtils
 {
     public static void WriteSpaces(this TextWriter writer, int length)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(length, 0);
+
+        if (length == 0)
+        {
+            return;
+        }
+
         char[] buffer = ArrayPool<char>.Shared.Rent(length);
         Array.Fill(buffer, ' ');
 

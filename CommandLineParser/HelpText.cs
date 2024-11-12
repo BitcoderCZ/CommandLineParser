@@ -48,10 +48,31 @@ public static class HelpText
 
     public static void GenerateForCommands(IEnumerable<Type> commandTypes, TextWriter writer)
     {
+        IndentedTextWriter indentedWriter = writer as IndentedTextWriter ?? new IndentedTextWriter(writer, "  ");
+
+        int maxNameLen = commandTypes.Max(t => ConsoleCommand.GetName(t).Length);
+
+        indentedWriter.WriteLine("Available commands:");
+
+        indentedWriter.Indent++;
         foreach (Type commandType in commandTypes)
         {
-            GenerateForCommand(commandType, writer);
+            string name = ConsoleCommand.GetName(commandType);
+            indentedWriter.Write(name);
+
+            var commandHelpTextAttrib = commandType.GetCustomAttribute<HelpTextAttribute>();
+            if (commandHelpTextAttrib is not null)
+            {
+                indentedWriter.WriteSpaces(maxNameLen - name.Length);
+                indentedWriter.WriteLine("  - " + commandHelpTextAttrib.HelpText);
+            }
+            else
+            {
+                indentedWriter.WriteLine();
+            }
         }
+
+        indentedWriter.Indent--;
     }
 
     public static void GenerateForCommand(Type commandType, TextWriter writer)
