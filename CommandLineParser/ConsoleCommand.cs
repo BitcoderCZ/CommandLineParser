@@ -39,7 +39,7 @@ public abstract class ConsoleCommand
 
         var arguments = properties
             .Where(prop => prop.GetCustomAttribute<ArgumentAttribute>() is not null)
-            .Select(prop => new CommandArgument(prop))
+            .Select(prop => new CommandArgument(prop, commandType))
             .OrderBy(arg => arg.Order)
             .ToArray();
 
@@ -75,7 +75,7 @@ public abstract class ConsoleCommand
 
         var options = properties
             .Where(prop => prop.GetCustomAttribute<OptionAttribute>() is not null)
-            .Select(prop => new CommandOption(prop))
+            .Select(prop => new CommandOption(prop, commandType))
             .ToArray();
 
         HashSet<char> shortNameOptions = [];
@@ -87,12 +87,12 @@ public abstract class ConsoleCommand
 
             if (option.ShortName is not null && !shortNameOptions.Add(option.ShortName.Value))
             {
-                throw new DuplicateParameterException(option.ShortName.Value.ToString());
+                throw new DuplicateParameterException(option.ShortName.Value.ToString(), option.CommandType);
             }
 
             if (option.LongName is not null && !longNameOptions.Add(option.LongName))
             {
-                throw new DuplicateParameterException(option.LongName);
+                throw new DuplicateParameterException(option.LongName, commandType);
             }
         }
 
@@ -111,6 +111,6 @@ public abstract class ConsoleCommand
         }
     }
 
-    internal static bool IsCommand(Type type)
+    internal static bool IsCommand(Type? type)
         => typeof(ConsoleCommand).IsAssignableFrom(type);
 }

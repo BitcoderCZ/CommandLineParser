@@ -2,8 +2,8 @@
 
 public sealed class CommandNotFoundException : UserErrorException
 {
-    public CommandNotFoundException(string commandName)
-        : base($"Command \"{commandName}\" doesn't exist.")
+    public CommandNotFoundException(string commandName, Type? commandType)
+        : base($"Command \"{commandName}\" doesn't exist.", commandType)
     {
     }
 }

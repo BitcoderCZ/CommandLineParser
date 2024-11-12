@@ -17,7 +17,7 @@ internal static class StringUtils
                 {
                     if (i + 1 >= text.Length)
                     {
-                        throw new InvalidEscapeSequenceException();
+                        throw new InvalidEscapeSequenceException(null);
                     }
 
                     numbSequences++;

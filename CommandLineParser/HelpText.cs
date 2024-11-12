@@ -1,4 +1,6 @@
-﻿using System.Reflection;
+﻿using System.CodeDom.Compiler;
+using System.Data;
+using System.Reflection;
 using CommandLineParser.Attributes;
 using CommandLineParser.CommandParameters;
 using CommandLineParser.Exceptions;
@@ -8,7 +10,7 @@ namespace CommandLineParser;
 
 public static class HelpText
 {
-    public static void Generate(Type commandType, TextWriter writer)
+    public static void GenerateForCommand(Type commandType, TextWriter writer)
     {
         // required to get the default values
         ConsoleCommand command = ConsoleCommand.CreateInstance(commandType);
@@ -92,6 +94,51 @@ public static class HelpText
         }
     }
 
+    public static void GenerateForError(UserErrorException exception, TextWriter writer)
+    {
+        IndentedTextWriter indentedWriter = writer as IndentedTextWriter ?? new IndentedTextWriter(writer, "  ");
+
+        indentedWriter.WriteLine("Error:");
+        indentedWriter.Indent++;
+
+        indentedWriter.WriteLine(exception.Message);
+
+        if (exception.InnerException is not null)
+        {
+            indentedWriter.Indent++;
+
+            WriteException(exception.InnerException);
+
+            indentedWriter.Indent--;
+        }
+
+        indentedWriter.Indent--;
+
+        indentedWriter.WriteLine();
+
+        void WriteException(Exception? exception)
+        {
+            while (exception is not null)
+            {
+                if (exception is AggregateException aggregateException)
+                {
+                    foreach (Exception ex in aggregateException.InnerExceptions)
+                    {
+                        WriteException(ex);
+                    }
+
+                    return;
+                }
+                else if (exception is not TargetInvocationException)
+                {
+                    indentedWriter.WriteLine(exception.Message);
+                }
+
+                exception = exception.InnerException;
+            }
+        }
+    }
+
     private static void WriteValidParameterValues(CommandParameter parameter, TextWriter writer)
     {
         if (parameter.Type == typeof(char))
@@ -121,10 +168,29 @@ public static class HelpText
                 writer.Write("<number");
             }
 
-            // TODO: account for greater than, less than attribs ...
             if (TypeUtils.TryGetMinMaxValues(parameter.Type, out object? min, out object? max))
             {
-                writer.Write($", {min} to {max}>");
+                string compSymbol1 = "<=";
+                string compSymbol2 = "<=";
+
+                if (parameter.HasRangeRequirements)
+                {
+                    var (greaterThan, lessThan) = parameter.GetRangeValues();
+
+                    if (greaterThan is not null)
+                    {
+                        min = greaterThan;
+                        compSymbol1 = "<";
+                    }
+
+                    if (lessThan is not null)
+                    {
+                        max = lessThan;
+                        compSymbol2 = "<";
+                    }
+                }
+
+                writer.Write($", {ObjectUtils.ToString(min)} {compSymbol1} value {compSymbol2} {ObjectUtils.ToString(max)}>");
             }
             else
             {

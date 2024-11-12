@@ -9,8 +9,8 @@ internal sealed class CommandOption : CommandParameter
     private readonly OptionAttribute _optionAttrib;
     private readonly DependsOnAttribute[] _dependsOnAttribs;
 
-    public CommandOption(PropertyInfo prop)
-        : base(prop)
+    public CommandOption(PropertyInfo prop, Type commandType)
+        : base(prop, commandType)
     {
         _optionAttrib = prop.GetCustomAttribute<OptionAttribute>()
             ?? throw new MissingAttributeException(prop.Name, typeof(OptionAttribute));
@@ -30,12 +30,6 @@ internal sealed class CommandOption : CommandParameter
     public string? LongName => _optionAttrib.LongName;
 
     public bool DependsOnAnotherParameter => _dependsOnAttribs.Length > 0;
-
-    public override object? GetValue(ConsoleCommand instance)
-        => _prop.GetGetMethod()!.Invoke(instance, []);
-
-    public override void SetValue(ConsoleCommand instance, object? value)
-        => _prop.GetSetMethod()!.Invoke(instance, [value]);
 
     public override string GetNames()
         => ShortName is null

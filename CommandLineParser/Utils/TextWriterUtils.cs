@@ -4,48 +4,6 @@ namespace CommandLineParser.Utils;
 
 internal static class TextWriterUtils
 {
-    public static void WriteIndented(this TextWriter writer, ReadOnlySpan<char> text, int indent, int width, int currentPos = 0)
-    {
-        if (indent >= width)
-        {
-            throw new ArgumentOutOfRangeException($"{nameof(indent)} must be smaller than {nameof(width)}.");
-        }
-
-        if (text.IsEmpty)
-        {
-            return;
-        }
-
-        int cursorPos = currentPos;
-
-        if (currentPos < indent)
-        {
-            writer.WriteSpaces(indent - currentPos);
-            cursorPos = indent;
-        }
-
-        while (text.Length > 0)
-        {
-            if (cursorPos < indent)
-            {
-                writer.WriteSpaces(indent - currentPos);
-                cursorPos = indent;
-            }
-
-            int length = width - cursorPos;
-            if (length == 0)
-            {
-                return;
-            }
-
-            writer.WriteLine(text[..length]);
-
-            text = text[length..];
-
-            cursorPos = 0;
-        }
-    }
-
     public static void WriteSpaces(this TextWriter writer, int length)
     {
         char[] buffer = ArrayPool<char>.Shared.Rent(length);

@@ -17,20 +17,44 @@ public static class CommandParser
         [typeof(char)] = (param, value)
             => !string.IsNullOrEmpty(value) && value.Length == 1
                 ? value[0]
-                : throw new InvalidParameterValueException(param.GetNames(), $"'{value}' must be a single character."),
+                : throw new InvalidParameterValueException(param.GetNames(), $"'{value}' must be a single character.", param.CommandType),
         [typeof(bool)] = (param, value)
             => string.IsNullOrWhiteSpace(value) || value.Equals("true", StringComparison.OrdinalIgnoreCase)
                 ? true
                 : value.Equals("false", StringComparison.OrdinalIgnoreCase)
                 ? (object)false
-                : throw new InvalidParameterValueException(param.GetNames(), $"'{value}' isn't a valid bool."),
+                : throw new InvalidParameterValueException(param.GetNames(), $"'{value}' isn't a valid bool.", param.CommandType),
     }.ToFrozenDictionary();
 
     private delegate object SpanParseCtor(ReadOnlySpan<char> span);
 
-    public static void ParseAndRun(string[] args, ParseOptions parseOptions, Type? defaultCommand, params Type[] commands)
+    public static void ParseAndRun(string[] args, ParseOptions parseOptions, Type? defaultCommand, Type[] commands, TextWriter? helpTextWriter = null)
     {
-        // TODO: try-catch UserErrorException, provide help text
+        ConsoleCommand command;
+
+        try
+        {
+            command = ParseInternal(args, parseOptions, defaultCommand, commands);
+        }
+        catch (UserErrorException ex)
+        {
+            helpTextWriter ??= Console.Out;
+
+            HelpText.GenerateForError(ex, helpTextWriter);
+
+            if (ex.CommandType is not null)
+            {
+                HelpText.GenerateForCommand(ex.CommandType, helpTextWriter);
+            }
+
+            return;
+        }
+
+        command.Run();
+    }
+
+    private static ConsoleCommand ParseInternal(string[] args, ParseOptions parseOptions, Type? defaultCommand, params Type[] commands)
+    {
         // TODO: help command, run if nothing is specified if the defaultCommand is null or it has options (if it doesn't have options, run it), help - description of all commands, help [command_name] - description of a specific command
         // TODO: version command - use Assembly version
         ConsoleCommand? command = null;
@@ -64,7 +88,7 @@ public static class CommandParser
 
             if (command is null)
             {
-                throw new CommandNotFoundException(commandName);
+                throw new CommandNotFoundException(commandName, null);
             }
         }
 
@@ -108,21 +132,21 @@ public static class CommandParser
 
             if (argsSpan[i].StartsWith("-", StringComparison.Ordinal))
             {
-                (string name, value, bool isLongName) = ParseOption(argsSpan[i]);
+                (string name, value, bool isLongName) = ParseOption(argsSpan[i], commandType);
 
                 parameter = isLongName
                     ? longNameOptions.TryGetValue(name, out var longOption)
                         ? longOption
-                        : throw new OptionNotFoundException(name, ConsoleCommand.GetName(command))
+                        : throw new OptionNotFoundException(name, ConsoleCommand.GetName(command), commandType)
                     : (shortNameOptions.TryGetValue(name[0], out var shortOption)
                         ? shortOption
-                        : throw new OptionNotFoundException(name, ConsoleCommand.GetName(command)));
+                        : throw new OptionNotFoundException(name, ConsoleCommand.GetName(command), commandType));
             }
             else
             {
                 if (argumentIndex >= arguments.Length)
                 {
-                    throw new ArgumentOutOfBounds(arguments.Length);
+                    throw new ArgumentOutOfBounds(arguments.Length, commandType);
                 }
 
                 parameter = arguments[argumentIndex++];
@@ -131,7 +155,7 @@ public static class CommandParser
 
             if (!assignedParameters.Add(parameter) && parseOptions.ThrowOnDuplicateArgument)
             {
-                throw new DuplicateParameterException(parameter.GetNames());
+                throw new DuplicateParameterException(parameter.GetNames(), commandType);
             }
 
             parameter.SetValue(command, ParseParameterValue(parameter, value, parseOptions));
@@ -142,7 +166,7 @@ public static class CommandParser
         {
             if (!assignedParameters.Contains(parameter))
             {
-                throw new ParameterNotAssignedException(parameter.GetNames());
+                throw new ParameterNotAssignedException(parameter.GetNames(), commandType);
             }
         }
 
@@ -167,27 +191,27 @@ public static class CommandParser
                 {
                     if (option.IsRequired && !assignedParameters.Contains(option))
                     {
-                        throw new ParameterNotAssignedException(option.GetNames());
+                        throw new ParameterNotAssignedException(option.GetNames(), commandType);
                     }
                 }
                 else
                 {
                     if (assignedParameters.Contains(option))
                     {
-                        throw new InvalidParameterAssignedException(option.GetNames());
+                        throw new InvalidParameterAssignedException(option.GetNames(), commandType);
                     }
                 }
             }
         }
 
-        command.Run();
+        return command;
     }
 
-    private static (string Name, string Value, bool IsLongName) ParseOption(ReadOnlySpan<char> arg)
+    private static (string Name, string Value, bool IsLongName) ParseOption(ReadOnlySpan<char> arg, Type commandType)
     {
         if (!arg.StartsWith("-", StringComparison.Ordinal))
         {
-            throw new InvalidOptionFormat(new string(arg));
+            throw new InvalidOptionFormat(new string(arg), commandType);
         }
 
         // remove - or --
@@ -240,7 +264,7 @@ public static class CommandParser
         {
             return EnumUtils.TryParse(parameter.Type, value, out object? enumValue)
                 ? enumValue
-                : throw new InvalidParameterValueException(parameter.GetNames(), $"'{value}' isn't a valid value for enum {parameter.Type.Name}, valid values are: {string.Join(", ", EnumUtils.GetNames(parameter.Type))}");
+                : throw new InvalidParameterValueException(parameter.GetNames(), $"'{value}' isn't a valid value for enum {parameter.Type.Name}, valid values are: {string.Join(", ", EnumUtils.GetNames(parameter.Type))}", parameter.CommandType);
         }
         else if (parameter.Type.HasGenericInterface(typeof(IParsable<>)))
         {
@@ -252,7 +276,7 @@ public static class CommandParser
             }
             catch (Exception ex)
             {
-                throw new InvalidParameterValueException(parameter.GetNames(), ex);
+                throw new InvalidParameterValueException(parameter.GetNames(), ex, parameter.CommandType);
             }
         }
 

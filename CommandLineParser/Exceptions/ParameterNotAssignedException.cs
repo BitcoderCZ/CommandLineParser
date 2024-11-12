@@ -2,8 +2,8 @@
 
 public sealed class ParameterNotAssignedException : UserErrorException
 {
-    public ParameterNotAssignedException(string parameterName)
-        : base($"Required parameter '{parameterName}' wasn't assigned.")
+    public ParameterNotAssignedException(string parameterName, Type? commandType)
+        : base($"Required parameter '{parameterName}' wasn't assigned.", commandType)
     {
     }
 }
