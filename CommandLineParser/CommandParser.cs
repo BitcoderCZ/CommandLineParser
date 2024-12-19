@@ -139,7 +139,15 @@ public static class CommandParser
 
             if (command is null)
             {
-                throw new CommandNotFoundException(commandName, null);
+                if (defaultCommand is not null)
+                {
+                    command = ConsoleCommand.CreateInstance(defaultCommand);
+                    argsSpan = args;
+                }
+                else
+                {
+                    throw new CommandNotFoundException(commandName, null);
+                }
             }
         }
 
