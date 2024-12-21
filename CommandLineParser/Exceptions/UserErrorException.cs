@@ -7,30 +7,30 @@ namespace CommandLineParser.Exceptions;
 /// </summary>
 public abstract class UserErrorException : Exception
 {
-    protected UserErrorException(string? message, Type? commandType)
-        : base(message)
-    {
-        if (commandType is not null && !ConsoleCommand.IsCommand(commandType))
-        {
-            throw new ArgumentException($"{nameof(commandType)} must be {nameof(ConsoleCommand)}.", nameof(commandType));
-        }
+	protected UserErrorException(string? message, Type? commandType)
+		: base(message)
+	{
+		if (commandType is not null && !ConsoleCommand.IsCommand(commandType))
+		{
+			throw new ArgumentException($"{nameof(commandType)} must be {nameof(ConsoleCommand)}.", nameof(commandType));
+		}
 
-        CommandType = commandType;
-    }
+		CommandType = commandType;
+	}
 
-    protected UserErrorException(string? message, Exception innerException, Type? commandType)
-        : base(message, innerException)
-    {
-        if (commandType is not null && !ConsoleCommand.IsCommand(commandType))
-        {
-            throw new ArgumentException($"{nameof(commandType)} must be {nameof(ConsoleCommand)}.", nameof(commandType));
-        }
+	protected UserErrorException(string? message, Exception innerException, Type? commandType)
+		: base(message, innerException)
+	{
+		if (commandType is not null && !ConsoleCommand.IsCommand(commandType))
+		{
+			throw new ArgumentException($"{nameof(commandType)} must be {nameof(ConsoleCommand)}.", nameof(commandType));
+		}
 
-        CommandType = commandType;
-    }
+		CommandType = commandType;
+	}
 
-    /// <summary>
-    /// Type of the command that was being processed when this exception was thrown.
-    /// </summary>
-    public Type? CommandType { get; }
+	/// <summary>
+	/// Type of the command that was being processed when this exception was thrown.
+	/// </summary>
+	public Type? CommandType { get; }
 }

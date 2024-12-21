@@ -7,17 +7,17 @@
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
 public sealed class CommandNameAttribute : Attribute
 {
-    public CommandNameAttribute(string name)
-    {
-        ArgumentException.ThrowIfNullOrEmpty(name);
+	public CommandNameAttribute(string name)
+	{
+		ArgumentException.ThrowIfNullOrEmpty(name);
 
-        if (name.Any(char.IsWhiteSpace))
-        {
-            throw new ArgumentException($"{nameof(name)} cannot contain whitespace.", nameof(name));
-        }
+		if (name.Any(char.IsWhiteSpace))
+		{
+			throw new ArgumentException($"{nameof(name)} cannot contain whitespace.", nameof(name));
+		}
 
-        Name = name;
-    }
+		Name = name;
+	}
 
-    public string Name { get; }
+	public string Name { get; }
 }

@@ -2,7 +2,7 @@
 
 public sealed class ParseOptions
 {
-    public bool ThrowOnDuplicateArgument { get; set; } = true;
+	public bool ThrowOnDuplicateArgument { get; set; } = true;
 
-    public List<ICommandParameterParser> Parsers { get; } = [];
+	public List<ICommandParameterParser> Parsers { get; } = [];
 }

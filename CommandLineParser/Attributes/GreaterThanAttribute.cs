@@ -7,17 +7,17 @@
 [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
 public class GreaterThanAttribute : Attribute
 {
-    public GreaterThanAttribute(object value)
-    {
-        ArgumentNullException.ThrowIfNull(value);
+	public GreaterThanAttribute(object value)
+	{
+		ArgumentNullException.ThrowIfNull(value);
 
-        if (value is not IComparable)
-        {
-            throw new ArgumentException($"{nameof(value)} must be {nameof(IComparable)}.", nameof(value));
-        }
+		if (value is not IComparable)
+		{
+			throw new ArgumentException($"{nameof(value)} must be {nameof(IComparable)}.", nameof(value));
+		}
 
-        Value = value;
-    }
+		Value = value;
+	}
 
-    public object Value { get; }
+	public object Value { get; }
 }

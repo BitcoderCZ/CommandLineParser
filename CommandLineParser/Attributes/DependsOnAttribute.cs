@@ -8,13 +8,13 @@
 [AttributeUsage(AttributeTargets.Property, AllowMultiple = true, Inherited = true)]
 public sealed class DependsOnAttribute : Attribute
 {
-    public DependsOnAttribute(string propertyName, object? propertyValue)
-    {
-        PropertyName = propertyName;
-        PropertyValue = propertyValue;
-    }
+	public DependsOnAttribute(string propertyName, object? propertyValue)
+	{
+		PropertyName = propertyName;
+		PropertyValue = propertyValue;
+	}
 
-    public string PropertyName { get; }
+	public string PropertyName { get; }
 
-    public object? PropertyValue { get; }
+	public object? PropertyValue { get; }
 }

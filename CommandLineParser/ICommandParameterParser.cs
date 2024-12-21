@@ -2,7 +2,7 @@
 
 public interface ICommandParameterParser
 {
-    bool CanParse(Type type);
+	bool CanParse(Type type);
 
-    object Parse(ReadOnlySpan<char> value, ParseOptions options);
+	object Parse(ReadOnlySpan<char> value, ParseOptions options);
 }

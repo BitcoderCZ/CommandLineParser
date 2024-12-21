@@ -7,17 +7,17 @@
 [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
 public class LessThanAttribute : Attribute
 {
-    public LessThanAttribute(object value)
-    {
-        ArgumentNullException.ThrowIfNull(value);
+	public LessThanAttribute(object value)
+	{
+		ArgumentNullException.ThrowIfNull(value);
 
-        if (value is not IComparable)
-        {
-            throw new ArgumentException($"{nameof(value)} must be {nameof(IComparable)}.", nameof(value));
-        }
+		if (value is not IComparable)
+		{
+			throw new ArgumentException($"{nameof(value)} must be {nameof(IComparable)}.", nameof(value));
+		}
 
-        Value = value;
-    }
+		Value = value;
+	}
 
-    public object Value { get; }
+	public object Value { get; }
 }

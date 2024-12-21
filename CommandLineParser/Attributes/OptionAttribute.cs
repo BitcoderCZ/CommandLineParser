@@ -3,42 +3,42 @@
 [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = true)]
 public sealed class OptionAttribute : Attribute
 {
-    public OptionAttribute(char shortName)
-    {
-        ShortName = shortName;
-    }
+	public OptionAttribute(char shortName)
+	{
+		ShortName = shortName;
+	}
 
-    public OptionAttribute(string longName)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(longName);
+	public OptionAttribute(string longName)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(longName);
 
-        longName = longName.Trim();
+		longName = longName.Trim();
 
-        if (longName.Length < 1)
-        {
-            throw new ArgumentException($"{nameof(longName)} must be longer than 1 character.", nameof(longName));
-        }
+		if (longName.Length < 1)
+		{
+			throw new ArgumentException($"{nameof(longName)} must be longer than 1 character.", nameof(longName));
+		}
 
-        LongName = longName;
-    }
+		LongName = longName;
+	}
 
-    public OptionAttribute(char shortName, string longName)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(longName);
+	public OptionAttribute(char shortName, string longName)
+	{
+		ArgumentException.ThrowIfNullOrWhiteSpace(longName);
 
-        longName = longName.Trim();
+		longName = longName.Trim();
 
-        if (longName.Length < 1)
-        {
-            throw new ArgumentException($"{nameof(longName)} must be longer than 1 character.", nameof(longName));
-        }
+		if (longName.Length < 1)
+		{
+			throw new ArgumentException($"{nameof(longName)} must be longer than 1 character.", nameof(longName));
+		}
 
-        ShortName = shortName;
+		ShortName = shortName;
 
-        LongName = longName;
-    }
+		LongName = longName;
+	}
 
-    public char? ShortName { get; }
+	public char? ShortName { get; }
 
-    public string? LongName { get; }
+	public string? LongName { get; }
 }
