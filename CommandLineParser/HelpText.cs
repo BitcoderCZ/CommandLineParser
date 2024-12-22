@@ -7,6 +7,7 @@ using System.CodeDom.Compiler;
 using System.Data;
 using System.Diagnostics;
 using System.Reflection;
+using System.Reflection.Metadata;
 
 namespace CommandLineParser;
 
@@ -104,7 +105,8 @@ public static class HelpText
 			writer.Write(' ');
 			writer.Write(option.GetNames());
 			writer.Write('=');
-			WriteValidParameterValues(option, writer);
+			var (greaterThan, lessThan) = option.GetRangeValues();
+			WriteValidParameterValues(option.Type, greaterThan, lessThan, writer);
 		}
 
 		if (nonReqNamedCount > 0)
@@ -204,27 +206,39 @@ public static class HelpText
 		}
 	}
 
-	private static void WriteValidParameterValues(CommandParameter parameter, TextWriter writer)
+	private static void WriteValidParameterValues(Type paramType, object? greaterThan, object? lessThan, TextWriter writer)
 	{
-		if (parameter.Type == typeof(char))
+		if (paramType == typeof(char))
 		{
 			writer.Write("<character>");
 		}
-		else if (parameter.Type == typeof(bool))
+		else if (paramType == typeof(bool))
 		{
 			writer.Write("true|false");
 		}
-		else if (parameter.Type.IsEnum)
+		else if (paramType.IsEnum)
 		{
-			writer.Write(string.Join('|', EnumUtils.GetNames(parameter.Type)));
+			writer.Write(string.Join('|', EnumUtils.GetNames(paramType)));
 		}
-		else if (TypeUtils.IsNumber(parameter.Type))
+		else if (ParameterUtils.IsCollection(paramType))
 		{
-			if (TypeUtils.IsFloatingPoint(parameter.Type))
+			Type elementType = ParameterUtils.GetElementType(paramType);
+			if (ParameterUtils.IsCollection(elementType))
+			{
+				writer.Write("<text>");
+				return;
+			}
+
+			WriteValidParameterValues(elementType, greaterThan, lessThan, writer);
+			writer.Write("[]");
+		}
+		else if (TypeUtils.IsNumber(paramType))
+		{
+			if (TypeUtils.IsFloatingPoint(paramType))
 			{
 				writer.Write("<decimal number");
 			}
-			else if (TypeUtils.IsInteger(parameter.Type))
+			else if (TypeUtils.IsInteger(paramType))
 			{
 				writer.Write("<whole number");
 			}
@@ -233,28 +247,24 @@ public static class HelpText
 				writer.Write("<number");
 			}
 
-			var (greaterThan, lessThan) = parameter.GetRangeValues();
 			object? min;
 			object? max;
 
-			if (TypeUtils.TryGetMinMaxValues(parameter.Type, out min, out max) || greaterThan is not null || lessThan is not null)
+			if (TypeUtils.TryGetMinMaxValues(paramType, out min, out max) || greaterThan is not null || lessThan is not null)
 			{
 				string compSymbol1 = "<=";
 				string compSymbol2 = "<=";
 
-				if (parameter.HasRangeRequirements)
+				if (greaterThan is not null)
 				{
-					if (greaterThan is not null)
-					{
-						min = greaterThan;
-						compSymbol1 = "<";
-					}
+					min = greaterThan;
+					compSymbol1 = "<";
+				}
 
-					if (lessThan is not null)
-					{
-						max = lessThan;
-						compSymbol2 = "<";
-					}
+				if (lessThan is not null)
+				{
+					max = lessThan;
+					compSymbol2 = "<";
 				}
 
 				writer.Write($", {ObjectUtils.ToString(min)} {compSymbol1} value {compSymbol2} {ObjectUtils.ToString(max)}>");
@@ -274,7 +284,8 @@ public static class HelpText
 	{
 		StringWriter writer = new StringWriter();
 
-		WriteValidParameterValues(parameter, writer);
+		var (greaterThan, lessThan) = parameter.GetRangeValues();
+		WriteValidParameterValues(parameter.Type, greaterThan, lessThan, writer);
 
 		writer.Write(' ');
 

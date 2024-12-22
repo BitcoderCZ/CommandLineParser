@@ -11,6 +11,10 @@ internal static class TypeUtils
 			.FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == interfaceType)
 			is not null;
 
+	public static Type? GetGenericInterface(this Type type, Type interfaceType)
+		=> type.GetInterfaces()
+			.FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == interfaceType);
+
 	public static bool IsNumber(Type type)
 		=> type.HasGenericInterface(typeof(INumber<>));
 

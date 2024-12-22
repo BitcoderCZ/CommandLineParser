@@ -12,22 +12,6 @@ namespace CommandLineParser;
 
 public static class CommandParser
 {
-	private static readonly FrozenDictionary<Type, Func<CommandParameter, string, object>> ParseBasicTypes = new Dictionary<Type, Func<CommandParameter, string, object>>()
-	{
-		[typeof(string)] = (param, value)
-			=> value,
-		[typeof(char)] = (param, value)
-			=> !string.IsNullOrEmpty(value) && value.Length == 1
-				? value[0]
-				: throw new InvalidParameterValueException(param.GetNames(), $"'{value}' must be a single character.", param.CommandType),
-		[typeof(bool)] = (param, value)
-			=> string.IsNullOrWhiteSpace(value) || value.Equals("true", StringComparison.OrdinalIgnoreCase)
-				? true
-				: value.Equals("false", StringComparison.OrdinalIgnoreCase)
-				? (object)false
-				: throw new InvalidParameterValueException(param.GetNames(), $"'{value}' isn't a valid bool.", param.CommandType),
-	}.ToFrozenDictionary();
-
 	private static readonly ImmutableArray<Type> BuiltInCommands =
 	[
 		typeof(HelpCommand),
@@ -45,10 +29,10 @@ public static class CommandParser
 	/// <param name="commands"></param>
 	/// <param name="helpTextWriter"></param>
 	/// <returns>Exit code</returns>
+	/// <exception cref="ParameterCreateException">Thrown when an instance of a type of a command parameter cannot be created.</exception>
 	public static int ParseAndRun(string[] args, ParseOptions parseOptions, Type? defaultCommand, IEnumerable<Type> commands, TextWriter? helpTextWriter = null)
 	{
-		commands = new HashSet<Type>(commands);
-		var commandsSet = (HashSet<Type>)commands;
+		var commandsSet = commands is HashSet<Type> set ? set : [.. commands];
 
 		if (defaultCommand is not null)
 		{
@@ -65,7 +49,7 @@ public static class CommandParser
 		ConsoleCommand command;
 		try
 		{
-			command = ParseInternal(args, parseOptions, defaultCommand, commands);
+			command = ParseInternal(args, parseOptions, defaultCommand, commandsSet);
 		}
 		catch (UserErrorException ex)
 		{
@@ -79,7 +63,7 @@ public static class CommandParser
 			}
 			else if (ex is NoCommandSpecified or CommandNotFoundException)
 			{
-				HelpText.GenerateForCommands(commands, helpTextWriter);
+				HelpText.GenerateForCommands(commandsSet, helpTextWriter);
 			}
 
 			return 1;
@@ -87,14 +71,22 @@ public static class CommandParser
 		catch (ShowHelpException ex)
 		{
 			HelpText.GenerateVersionInfo(helpTextWriter);
-			HelpText.GenerateForCommand(ex.CommandType, helpTextWriter);
+			if (ex.CommandType is null)
+			{
+				HelpText.GenerateForCommands(commandsSet, helpTextWriter);
+			}
+			else
+			{
+				HelpText.GenerateForCommand(ex.CommandType, helpTextWriter);
+			}
+
 			return 0;
 		}
 
 		if (command is HelpCommand)
 		{
 			HelpText.GenerateVersionInfo(helpTextWriter);
-			HelpText.GenerateForCommands(commands, helpTextWriter);
+			HelpText.GenerateForCommands(commandsSet, helpTextWriter);
 			return 0;
 		}
 		else if (command is VersionCommand)
@@ -106,9 +98,21 @@ public static class CommandParser
 		return command.Run();
 	}
 
+	/// <exception cref="NoCommandSpecified"></exception>
+	/// <exception cref="CommandNotFoundException"></exception>
+	/// <exception cref="ShowHelpException"></exception>
+	/// <exception cref="OptionNotFoundException"></exception>
+	/// <exception cref="ArgumentOutOfBounds"></exception>
+	/// <exception cref="DuplicateParameterException"></exception>
+	/// <exception cref="ParameterNotAssignedException"></exception>
+	/// <exception cref="InvalidOptionDepencyException"></exception>
+	/// <exception cref="InvalidParameterAssignedException"></exception>
+	/// <exception cref="InvalidParameterValueException"></exception>
+	/// <exception cref="ParameterCreateException"></exception>
 	private static ConsoleCommand ParseInternal(string[] args, ParseOptions parseOptions, Type? defaultCommand, IEnumerable<Type> commands)
 	{
 		ConsoleCommand? command = null;
+		bool isDefaultCommand = false;
 
 		ReadOnlySpan<string> argsSpan;
 
@@ -117,6 +121,7 @@ public static class CommandParser
 		{
 			command = ConsoleCommand.CreateInstance(defaultCommand);
 			argsSpan = args;
+			isDefaultCommand = true;
 		}
 		else
 		{
@@ -143,6 +148,7 @@ public static class CommandParser
 				{
 					command = ConsoleCommand.CreateInstance(defaultCommand);
 					argsSpan = args;
+					isDefaultCommand = true;
 				}
 				else
 				{
@@ -195,7 +201,14 @@ public static class CommandParser
 
 				if (isLongName && name == "help")
 				{
-					throw new ShowHelpException(commandType);
+					if (isDefaultCommand)
+					{
+						throw new ShowHelpException();
+					}
+					else
+					{
+						throw new ShowHelpException(commandType);
+					}
 				}
 
 				parameter = isLongName
@@ -222,7 +235,7 @@ public static class CommandParser
 				throw new DuplicateParameterException(parameter.GetNames(), commandType);
 			}
 
-			parameter.SetValue(command, ParseParameterValue(parameter, value, parseOptions));
+			parameter.SetValue(command, ParseParameterValue(parameter.Type, parameter.GetNames(), parameter.CommandType, value, parseOptions));
 		}
 
 		// validate required options have been assigned
@@ -310,29 +323,43 @@ public static class CommandParser
 		return (name, value, isLongName);
 	}
 
-	private static object? ParseParameterValue(CommandParameter parameter, string value, ParseOptions parseOptions)
+	/// <exception cref="InvalidParameterValueException"></exception>
+	/// <exception cref="ParameterCreateException"></exception>
+	private static object? ParseParameterValue(Type paramType, string paramName, Type commandType, string value, ParseOptions parseOptions)
 	{
 		for (int i = 0; i < parseOptions.Parsers.Count; i++)
 		{
-			if (parseOptions.Parsers[i].CanParse(parameter.Type))
+			if (parseOptions.Parsers[i].CanParse(paramType))
 			{
 				return parseOptions.Parsers[i].Parse(value, parseOptions);
 			}
 		}
 
-		if (ParseBasicTypes.TryGetValue(parameter.Type, out var parseFunc))
+		if (paramType == typeof(string))
 		{
-			return parseFunc.Invoke(parameter, value);
+			return value;
 		}
-		else if (parameter.Type.IsEnum)
+		else if (paramType == typeof(char))
 		{
-			return EnumUtils.TryParse(parameter.Type, value, out object? enumValue)
+			return !string.IsNullOrEmpty(value) && value.Length == 1
+				? value[0]
+				: throw new InvalidParameterValueException(paramName, $"'{value}' must be a single character.", paramType);
+		}
+		else if (paramType == typeof(bool))
+		{
+			return bool.TryParse(value, out bool result)
+				? result
+				: throw new InvalidParameterValueException(paramName, $"'{value}' isn't a valid bool.", commandType);
+		}
+		else if (paramType.IsEnum)
+		{
+			return EnumUtils.TryParse(paramType, value, out object? enumValue)
 				? enumValue
-				: throw new InvalidParameterValueException(parameter.GetNames(), $"'{value}' isn't a valid value for enum {parameter.Type.Name}, valid values are: {string.Join(", ", EnumUtils.GetNames(parameter.Type))}", parameter.CommandType);
+				: throw new InvalidParameterValueException(paramName, $"'{value}' isn't a valid value for enum {paramType.Name}, valid values are: {string.Join(", ", EnumUtils.GetNames(paramType))}", commandType);
 		}
-		else if (parameter.Type.HasGenericInterface(typeof(IParsable<>)))
+		else if (paramType.HasGenericInterface(typeof(IParsable<>)))
 		{
-			InterfaceMapping mapping = parameter.Type.GetInterfaceMap(typeof(IParsable<>).MakeGenericType([parameter.Type]));
+			InterfaceMapping mapping = paramType.GetInterfaceMap(typeof(IParsable<>).MakeGenericType([paramType]));
 
 			try
 			{
@@ -340,12 +367,32 @@ public static class CommandParser
 			}
 			catch (Exception ex)
 			{
-				throw new InvalidParameterValueException(parameter.GetNames(), ex, parameter.CommandType);
+				throw new InvalidParameterValueException(paramName, ex, commandType);
 			}
+		}
+		else if (ParameterUtils.IsCollection(paramType))
+		{
+			var elementType = ParameterUtils.GetElementType(paramType);
+			if (ParameterUtils.IsCollection(elementType))
+			{
+				throw new ParameterCreateException(paramName, $"Nested collection types aren't supported.");
+			}
+
+			string[] split = value.Split(',');
+			Array arr = Array.CreateInstance(elementType, split.Length);
+			for (int i = 0; i < split.Length; i++)
+			{
+				arr.SetValue(ParseParameterValue(elementType, paramName, commandType, split[i], parseOptions), i);
+			}
+
+			MethodInfo createInstance = typeof(ParameterUtils).GetMethod(nameof(ParameterUtils.CreateCollectionInstance), BindingFlags.Public | BindingFlags.Static)!
+				.MakeGenericMethod(elementType);
+
+			return createInstance.Invoke(null, [paramType, arr]);
 		}
 
 		// string constructor
-		var constructor = parameter.Type.GetConstructor([typeof(string)]);
+		var constructor = paramType.GetConstructor([typeof(string)]);
 
 		if (constructor is not null)
 		{
@@ -353,7 +400,7 @@ public static class CommandParser
 		}
 
 		// ReadOnlySpan<char> ctor
-		constructor = parameter.Type.GetConstructor([typeof(ReadOnlySpan<char>)]);
+		constructor = paramType.GetConstructor([typeof(ReadOnlySpan<char>)]);
 
 		if (constructor is not null)
 		{
@@ -367,6 +414,6 @@ public static class CommandParser
 			return delegateCtor((ReadOnlySpan<char>)value);
 		}
 
-		throw new Exception($"The option '{parameter.GetNames()}' couldn't be parsed because it doesn't have a constructor that takes string/ReadOnlySpan<char> and no custom parser is defined for it.");
+		throw new ParameterCreateException(paramName, $"The type '{paramType.FullName}' doesn't have a constructor that takes string/ReadOnlySpan<char> and no custom parser is defined for it.");
 	}
 }
