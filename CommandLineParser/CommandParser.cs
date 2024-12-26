@@ -378,7 +378,8 @@ public static class CommandParser
 				throw new ParameterCreateException(paramName, $"Nested collection types aren't supported.");
 			}
 
-			string[] split = value.Split(',');
+			string[] split = string.IsNullOrEmpty(value) ? [] : value.Split(',');
+
 			Array arr = Array.CreateInstance(elementType, split.Length);
 			for (int i = 0; i < split.Length; i++)
 			{
