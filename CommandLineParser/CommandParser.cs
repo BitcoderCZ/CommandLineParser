@@ -347,6 +347,13 @@ public static class CommandParser
 		}
 		else if (paramType == typeof(bool))
 		{
+#pragma warning disable IDE0046 // Convert to conditional expression
+			if (string.IsNullOrWhiteSpace(value) || value.Length == 0)
+			{
+				return true;
+			}
+#pragma warning restore IDE0046
+
 			return bool.TryParse(value, out bool result)
 				? result
 				: throw new InvalidParameterValueException(paramName, $"'{value}' isn't a valid bool.", commandType);
